@@ -1,0 +1,2331 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Planta · perímetro y reparto de locales</title>
+<style>
+:root{
+  --paper:#EDF0F2; --white:#fff; --ink:#0F1720; --ink60:#5B6771; --ink30:#98A3AC;
+  --rule:#C6CFD6; --red:#B0341F;
+  --pub:#D9A441; --nex:#B4BDC2; --pri:#4C6FBF; --ser:#7E8C6A;
+  --serif:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;
+  --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --mono:ui-monospace,'SFMono-Regular',Menlo,Consolas,monospace;
+  --bar:46px; --panel:396px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:13.5px;-webkit-font-smoothing:antialiased}
+kbd{font-family:var(--mono);font-size:10px;background:#fff;border:1px solid var(--rule);border-bottom-width:2px;border-radius:3px;padding:0 4px}
+
+#top{height:var(--bar);border-bottom:1px solid var(--ink);display:flex;align-items:center;gap:14px;padding:0 14px;background:var(--paper);position:relative;z-index:5}
+#top h1{font-family:var(--serif);font-weight:400;font-size:15.5px;margin:0;white-space:nowrap}
+#top h1 em{font-style:italic;color:var(--ink60);font-size:13px}
+.sep{width:1px;height:22px;background:var(--rule)}
+.tools{display:flex;gap:5px;align-items:center;flex-wrap:nowrap;overflow:hidden}
+button{font-family:var(--sans);font-size:12.5px;background:transparent;color:var(--ink);border:1px solid var(--rule);
+  border-radius:2px;padding:5px 10px;cursor:pointer;white-space:nowrap}
+button:hover{border-color:var(--red);color:var(--red)}
+button.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+button.solid{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+button.solid:hover{background:var(--red);border-color:var(--red);color:#fff}
+button[disabled]{opacity:.35;cursor:not-allowed;border-color:var(--rule);color:var(--ink30)}
+button:focus-visible,input:focus,select:focus{outline:2px solid var(--red);outline-offset:1px}
+#spacer{flex:1}
+
+#body{display:flex;height:calc(100% - var(--bar))}
+#stage{flex:1;position:relative;background:var(--white);min-width:0;cursor:crosshair}
+#stage.panning{cursor:grabbing}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.hud{position:absolute;font-family:var(--mono);font-size:10.5px;color:var(--ink60);
+  background:rgba(255,255,255,.86);padding:3px 7px;border:1px solid var(--rule);pointer-events:none}
+#coords{left:10px;bottom:10px}
+#scalebar{right:10px;bottom:10px;display:flex;align-items:center;gap:7px}
+#scalebar .bar{height:6px;border:1px solid var(--ink);border-top:none;display:inline-block}
+#hint{left:10px;top:10px;max-width:360px;line-height:1.7}
+#legend{right:10px;top:10px;display:none;gap:12px}
+#legend i{display:inline-block;width:9px;height:9px;margin-right:4px;border:1px solid rgba(0,0,0,.35);vertical-align:-1px}
+
+#panel{width:var(--panel);border-left:1px solid var(--rule);background:var(--paper);overflow-y:auto;flex-shrink:0}
+#panel.hide{display:none}
+.tabs{display:flex;border-bottom:1px solid var(--ink);position:sticky;top:0;background:var(--paper);z-index:2}
+.tabs button{flex:1;border:none;border-radius:0;padding:10px 6px;font-family:var(--mono);font-size:10.5px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--ink30);border-bottom:2px solid transparent}
+.tabs button.on{color:var(--ink);border-bottom-color:var(--red);background:transparent}
+.tabs button:not(.on){background:transparent}
+.tabs button:hover{color:var(--red)}
+.pane{padding:14px 14px 40px}
+.pane.off{display:none}
+h2{font-family:var(--serif);font-weight:400;font-size:15px;margin:0 0 3px}
+p.note{color:var(--ink60);font-size:12px;margin:0 0 12px;line-height:1.5}
+.blockhead{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink30);
+  margin:18px 0 7px;border-bottom:1px solid var(--rule);padding-bottom:4px}
+.blockhead:first-child{margin-top:0}
+.readout{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--mono);font-size:11px;color:var(--ink60);margin:0 0 12px}
+.readout b{display:block;font-size:21px;color:var(--ink);font-weight:500;letter-spacing:-.01em}
+table.edges{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
+table.edges tr.hi td{background:#FBEFEC}
+table.edges td{padding:2px 3px;border-bottom:1px dotted var(--rule)}
+table.edges td.d{color:var(--ink30);width:16px;text-align:center}
+table.edges td.l{color:var(--ink30);width:34px}
+table.edges .tag{border:1px solid var(--rule);background:#fff;border-radius:2px;padding:1px 3px;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.04em;color:var(--ink60);cursor:pointer;width:100%}
+table.edges .tag:hover{border-color:var(--red);color:var(--red)}
+table.edges .tag.med{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+table.edges .tag.no{color:var(--red);border-color:var(--red)}
+table.edges input{width:100%;text-align:right;font-family:var(--mono);font-size:12px;padding:2px 5px;
+  border:1px solid var(--rule);border-radius:2px;background:#fff;color:var(--ink)}
+input[type=text],input[type=number],select{font-family:var(--mono);font-size:12.5px;color:var(--ink);background:#fff;
+  border:1px solid var(--rule);border-radius:2px;padding:5px 6px;width:100%}
+label.f{display:block;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink60);margin:0 0 3px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.chk{display:flex;gap:6px;align-items:center;font-size:12px}
+.chk input{width:auto}
+
+.locales{display:flex;flex-direction:column;gap:6px}
+.local{background:#fff;border:1px solid var(--rule);border-left-width:5px;padding:5px 7px;border-radius:2px}
+.local .l1{display:grid;grid-template-columns:16px 1fr 78px 15px;gap:6px;align-items:center}
+.local .l2{display:grid;grid-template-columns:66px 66px 1fr;gap:6px;align-items:center;margin-top:5px}
+.local .l3{display:grid;grid-template-columns:78px 1fr;gap:6px;align-items:center;margin-top:4px}
+.local .l4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;align-items:center;margin-top:5px;
+  padding-top:5px;border-top:1px dotted var(--rule)}
+.local .l4 select{padding:2px 2px;font-size:10px}
+.local .l5{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:5px}
+.local .rlab{font-family:var(--mono);font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink30)}
+.local .rels{display:flex;flex-wrap:wrap;gap:4px}
+.local .rel{border:1px solid var(--rule);background:#fff;border-radius:9px;padding:1px 7px;
+  font-size:10px;color:var(--ink60);cursor:pointer}
+.local .rel.contiguo{border-color:#4C6FBF;color:#4C6FBF}
+.local .rel.proximo{border-color:#7E8C6A;color:#7E8C6A}
+.local .rel.evitar{border-color:var(--red);color:var(--red)}
+.local .addrel{border:1px dashed var(--rule);background:none;padding:0 6px;font-size:12px;
+  line-height:1.4;color:var(--ink30);cursor:pointer;border-radius:9px}
+.local .newrel{width:auto;font-size:10px;padding:1px 3px}
+.local .fld{display:flex;align-items:center;gap:3px}
+.local .fld span{font-family:var(--mono);font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink30)}
+.local input,.local select{padding:2px 4px;font-size:11.5px}
+.local input.name{font-family:var(--sans);text-align:left}
+.local input.num{text-align:right;padding:2px 3px}
+.local select{font-family:var(--sans);font-size:10.5px}
+.local .nn{font-family:var(--mono);font-size:9px;color:var(--ink30)}
+.local .calc{font-family:var(--mono);font-size:11px;color:var(--ink60);text-align:right}
+.local .calc b{color:var(--ink);font-weight:500}
+.local .calc.cap b{color:var(--red)}
+.local .x{border:none;background:none;color:var(--ink30);cursor:pointer;font-size:14px;line-height:1;padding:0}
+.local .x:hover{color:var(--red)}
+.totals{font-family:var(--mono);font-size:11.5px;color:var(--ink60);line-height:1.8;margin:10px 0 0;
+  border-top:1px solid var(--rule);padding-top:8px}
+.totals b{color:var(--ink);font-weight:500}
+.totals .bad{color:var(--red)}
+.slider label{display:flex;justify-content:space-between;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink60)}
+.slider label span{font-family:var(--mono);color:var(--ink)}
+input[type=range]{width:100%;accent-color:var(--red);margin:2px 0 8px}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.opt{border:1px solid var(--rule);background:#fff;cursor:pointer;padding:0}
+.opt canvas{width:100%;display:block}
+.opt .cap{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9.5px;padding:3px 5px;
+  border-top:1px solid var(--rule);color:var(--ink60)}
+.opt.sel{outline:2px solid var(--red);outline-offset:-1px}
+.opt.sel .cap{color:var(--red)}
+table.m{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px}
+table.m th{font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink30);text-align:right;
+  font-weight:400;padding:0 3px 3px;border-bottom:1px solid var(--ink)}
+table.m th:first-child,table.m td:first-child{text-align:left}
+table.m td{padding:3px;border-bottom:1px dotted var(--rule);text-align:right}
+table.m td.n{font-family:var(--sans);font-size:11.5px}
+table.m tr.fail td{color:var(--red)}
+.sc{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-family:var(--mono);font-size:9.5px;color:var(--ink60);margin:0 0 4px}
+.sc b{display:block;font-size:15px;color:var(--ink);font-weight:500}
+.circ{font-family:var(--mono);font-size:10.5px;color:var(--ink60);margin:8px 0 0;
+  border-top:1px dotted var(--rule);padding-top:6px;line-height:1.6}
+.circ b{color:var(--ink)}
+.circ .warn{color:var(--red)}
+.opt .cap span:first-child{max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msg{background:#fff;border-left:3px solid var(--red);padding:7px 9px;font-size:11.5px;margin:10px 0 0;line-height:1.5}
+.msg ul{margin:5px 0 0;padding-left:16px}
+.msg li{margin:2px 0}
+.msg.stale{border-left-color:#D9A441;background:#FFFBF2}
+.msg.stop{border-left-width:4px}
+.msg.scope{border-left-color:#4C6FBF;background:#F5F7FC}
+</style>
+</head>
+<body>
+
+<div id="top">
+  <h1>Planta <em>— perímetro y reparto</em></h1>
+  <div class="sep"></div>
+  <div class="tools">
+    <button id="bDraw">Dibujar</button>
+    <button id="bCloseShape">Cerrar</button>
+    <button id="bUndo">Deshacer</button>
+    <button id="bDoor">Acceso</button>
+    <div class="sep"></div>
+    <button id="bFit">Encajar vista</button>
+    <button id="bImport">Importar</button>
+    <input type="file" id="file" accept=".json" style="display:none">
+  </div>
+  <div id="spacer"></div>
+  <div class="tools">
+    <button id="bSvg">SVG</button>
+    <button id="bPng">PNG</button>
+    <button id="bPanel">Panel</button>
+  </div>
+</div>
+
+<div id="body">
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div class="hud" id="hint"></div>
+    <div class="hud" id="legend"><span><i style="background:var(--pub)"></i>público</span><span><i style="background:var(--nex)"></i>nexo</span><span><i style="background:var(--pri)"></i>privado</span><span><i style="background:var(--ser)"></i>servicio</span><span><i style="background:#E9E7E4"></i>libre</span></div>
+    <div class="hud" id="coords">— , —</div>
+    <div class="hud" id="scalebar"></div>
+  </div>
+
+  <aside id="panel">
+    <div class="tabs">
+      <button id="t1" class="on">01 · perímetro</button>
+      <button id="t2">02 · locales</button>
+    </div>
+
+    <div class="pane" id="p1">
+      <div class="readout">
+        <span>superficie<b id="area">—</b></span>
+        <span style="text-align:right">perímetro<b id="peri">—</b></span>
+      </div>
+      <div class="row" style="margin-bottom:10px">
+        <label class="chk" style="flex:1">norte
+          <input type="range" id="north" min="0" max="359" step="1" value="90" style="flex:1">
+          <span id="vNorth" style="font-family:var(--mono);font-size:11px">90°</span>
+        </label>
+      </div>
+      <div class="row" style="margin-bottom:12px">
+        <label class="chk"><input type="checkbox" id="ortho" checked> ortogonal</label>
+        <label class="chk">rejilla
+          <select id="snap" style="width:auto">
+            <option value="0.1">0,10</option><option value="0.25">0,25</option>
+            <option value="0.5" selected>0,50</option><option value="1">1,00</option>
+          </select> m
+        </label>
+      </div>
+      <div class="blockhead">lados</div>
+      <table class="edges" id="edges"></table>
+      <div id="pmsg"></div>
+      <div class="blockhead">cómo se edita</div>
+      <p class="note">Al cambiar la medida de un lado sólo se mueven sus dos vértices siguientes: la pared que lo cierra se desplaza y el lado paralelo contiguo absorbe la diferencia. El resto de la figura no se toca.</p>
+    </div>
+
+    <div class="pane off" id="p2">
+      <div class="blockhead">programa</div>
+      <div class="locales" id="locales"></div>
+      <div class="row" style="margin-top:8px">
+        <button id="bAdd">+ local</button>
+        <button id="bPre1">Vivienda</button>
+        <button id="bPre2">Oficina</button>
+        <button id="bClear">Vaciar</button>
+      </div>
+      <div class="totals" id="totals"></div>
+
+      <div class="blockhead">reparto</div>
+      <div class="slider"><label>Proporción compacta <span id="vProp">1,0</span></label>
+        <input type="range" id="wProp" min="0" max="3" step="0.1" value="1"></div>
+      <div class="slider"><label>Variación entre opciones <span id="vNoise">0,5</span></label>
+        <input type="range" id="wNoise" min="0" max="1.5" step="0.05" value="0.5"></div>
+      <div class="grid2" style="margin-bottom:8px">
+        <div><label class="f">Ensayos</label><input type="number" id="tries" value="120" min="6" max="400"></div>
+        <div><label class="f">Opciones máx.</label><input type="number" id="maxOpts" value="10" min="1" max="16"></div>
+      </div>
+      <div class="grid2" style="margin-bottom:12px">
+        <div><label class="f">Paso puerta m</label><input type="number" id="door" value="0.85" min="0.6" max="2" step="0.05" onchange="reprojectDoor();invalidate('has cambiado el ancho de puerta')"></div>
+        <div><label class="f">Semilla</label><input type="number" id="seed" value="7" min="0"></div>
+      </div>
+      <button id="bRun" class="solid" style="width:100%;padding:10px">Generar distribuciones</button>
+      <div class="blockhead">reglas que aplica</div>
+      <p class="note" style="margin:0 0 8px">
+      <b>Duras</b> — la opción se descarta si falla alguna, y no puntúan:<br>
+      · cada local contiene un rectángulo con sus lados a×b;<br>
+      · nadie baja de su mínimo <i>a</i>×<i>b</i>, ni pasa del máximo que hayas escrito
+        (el sobre de búsqueda interno del motor no es una condición del programa);<br>
+      · todo público y privado tiene un tramo <i>continuo</i> de fachada, medido sobre
+        los tramos reales del perímetro;<br>
+      · todos los locales del programa son accesibles;<br>
+      · quien tenga «abre a: sólo nexo» da a un nexo por <i>todas</i> sus puertas
+        interiores, no sólo por aquella que le da acceso, y los privados tienen una sola;<br>
+      · los locales marcados <b>contiguos</b> comparten frontera real de al menos un paso de puerta;<br>
+      · la <b>superficie libre</b> es área no programada: no recibe puertas ni sirve de paso.<br><br>
+      <b>Calidad</b> — ordena las que pasan, con los pesos renormalizados sobre los
+      criterios activos: relaciones 30 %, circulación 20 %, fidelidad al reparto 15 %,
+      regularidad 10 %, entrada 10 %, fachada 9 %, orientación 6 %, agrupación 5 %.
+      Un criterio sin datos (sin relaciones declaradas, sin orientaciones) no puntúa ni
+      infla la nota.<br><br>
+      <b>Si no hay solución estricta</b>, el motor primero <i>busca más lejos</i>: amplía
+      el sobre en el que puede estirar cada local mientras explora particiones. Eso no
+      relaja ninguna regla del programa, porque ese sobre no es una condición
+      arquitectónica. Sólo el último escalón cede en algo declarado: la apertura
+      obligatoria por nexo. Los lados mínimos, los máximos que escribas, la fachada y
+      la contigüidad no ceden nunca.<br><br>
+      <b>Cuatro magnitudes, deliberadamente separadas.</b> El <b>mínimo</b> sale de
+      <i>a</i>×<i>b</i> y es dura. El <b>máximo escrito</b> es dura y no se toca. El
+      <b>sobre de búsqueda</b> es interno del motor: acota hasta dónde puede estirarse un
+      local mientras busca, y no depende de la elasticidad. La <b>elasticidad</b> decide
+      sólo hacia dónde se empuja el excedente. Antes una sola cifra hacía los dos últimos
+      trabajos, y al tocarla se movían a la vez el espacio admisible y el objetivo.<br><br>
+      <b>Qué significa «no hay solución».</b> Hay tres respuestas distintas y el programa
+      no las mezcla. <i>Programa incompatible</i>: una condición necesaria no puede
+      cumplirse y se enumera cuál. <i>Fuera del alcance del motor</i>: el caso queda
+      fuera de la familia de particiones rectangulares que este generador explora —un
+      contorno oblicuo, por ejemplo— y eso no demuestra que la planta no exista.
+      <i>No encontrada</i>: la búsqueda no dio con ninguna; el motor es estocástico y
+      muestrea sólo una parte de lo alcanzable, así que tampoco demuestra nada.<br><br>
+      <b>Sobre la contigüidad.</b> El bloque se preserva durante la asignación a regiones
+      y en los cortes principales; la garantía final la da la comprobación dura, que
+      descarta la planta si la frontera común no existe.<br><br>
+      <b>Un solo grafo de puertas.</b> Accesibilidad, profundidad de recorrido y distancia
+      entre locales relacionados se miden sobre el mismo grafo final, con las puertas
+      secundarias incluidas. Y la condición que decide si una puerta puede existir es la
+      misma en la generación y en la validación: si el generador se equivoca, la planta
+      no pasa el filtro.</p>
+      <div id="resbox"></div>
+      <p class="note" style="margin:14px 0 0;color:var(--ink30);font-size:11px">
+      Las opciones no son un ranking: cada una es la campeona de un criterio
+      —equilibrada, mejores relaciones, mejor circulación, mejor fachada, más fiel al
+      programa, geometría más regular. Una misma planta puede ganar varios y entonces
+      lleva todas sus etiquetas; ⚑ marca las que necesitaron ceder en algo.</p>
+    </div>
+  </aside>
+</div>
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+const CATS={publico:{label:'público',h:41,s:64},nexo:{label:'nexo',h:205,s:9},
+  privado:{label:'privado',h:222,s:44},servicio:{label:'servicio',h:82,s:16},
+  resto:{label:'libre',h:0,s:0}};
+const CATORDER=['publico','nexo','privado','servicio'];
+const nf=(v,d=2)=>v.toLocaleString('es-ES',{minimumFractionDigits:d,maximumFractionDigits:d});
+const EPS=1e-6;
+
+/* ═════════ estado ═════════ */
+const S={
+  pts:[{x:-5,y:5},{x:5,y:5},{x:5,y:0},{x:15,y:0},{x:15,y:-6},{x:-5,y:-6}],
+  closed:true, drawing:false, doorMode:false,
+  door:{x:0,y:-6},
+  hoverEdge:-1, dragV:-1, dragE:-1, dragRef:null, cursor:null,
+  sides:[], north:90, edgeMode:0,
+  rooms:[], rel:{}, options:[], sel:-1, tab:1, yielded:null
+};
+let RID=1;
+const ELAST={publico:100,privado:60,servicio:35,nexo:8,resto:0};
+const ENTRY_DEF={publico:'permitida',nexo:'permitida',privado:'prohibida',servicio:'prohibida',resto:'prohibida'};
+// El marcador de acceso compite en METROS contra la preferencia de entrada. Una
+// bonificación escrita en metros crudos (antes 120) es inalcanzable en cualquier
+// planta real: el marcador quedaba decorativo. Ahora se expresa como fracción
+// del tamaño de la planta. Con 0,5 el local «preferente» gana salvo que esté a
+// más de media diagonal de distancia que la alternativa; barrido sobre el caso
+// de la oficina en L: por debajo de 0,5 sólo el 48 % de las plantas entran por
+// Recepción, con 0,5 entran el 100 %.
+const ENTRY_PREF=0.5;
+// Alcance del criterio «entrada». Antes era 1-d/8 con suelo 0,4: ocho metros
+// fijos, así que en cualquier planta mediana saturaba y no distinguía una
+// puerta a 8 m de otra a 16.
+const ENT_SPAN=0.5;
+function plantDiag(){const xs=S.pts.map(p=>p.x),ys=S.pts.map(p=>p.y);
+  return Math.max(1,Math.hypot(Math.max(...xs)-Math.min(...xs),
+                               Math.max(...ys)-Math.min(...ys)));}
+const OPEN_DEF={privado:'nexo',servicio:'pref',publico:'libre',nexo:'libre',resto:'libre'};
+function addRoom(n,c,a,b,mx=0,o){
+  if(S.rooms.length>=20)return;
+  S.rooms.push(Object.assign({id:RID++,name:n,cat:c,a,b,maxArea:mx,
+    elast:ELAST[c],entry:ENTRY_DEF[c],open:OPEN_DEF[c],orient:'',rel:[]},o||{}));}
+const relKey=(i,j)=>i<j?i+'-'+j:j+'-'+i;
+function relOf(i,j){const r=S.rel&&S.rel[relKey(i,j)];return r||'indiferente';}
+function setRel(i,j,v){S.rel=S.rel||{};if(v==='indiferente')delete S.rel[relKey(i,j)];else S.rel[relKey(i,j)]=v;}
+const minArea=r=>r.a*r.b;
+// ─────────────────────────────────────────────────────────────────────────
+//  CUATRO MAGNITUDES DISTINTAS, deliberadamente separadas
+//
+//  1 · minArea(r)          a × b. Condición ARQUITECTÓNICA dura.
+//  2 · r.maxArea           máximo escrito por el usuario. Dura. No se relaja
+//                          nunca, ni siquiera bajando por la escala.
+//  3 · searchCap(r,…)      sobre de búsqueda INTERNO del generador. No es una
+//                          regla del programa: sólo acota hasta dónde puede
+//                          estirarse un local mientras el motor busca una
+//                          partición. Es independiente de la elasticidad.
+//  4 · target (programTargets)  hacia dónde se intenta llevar cada local.
+//                          BLANDO, y aquí sí manda la elasticidad.
+//
+//  Antes, elast hacía a la vez 3 y 4: al tocarla se movían simultáneamente el
+//  espacio factible y el punto al que el generador apunta, y la cobertura salía
+//  con ventanas. effMax era monótono en elast; la cobertura no lo era.
+// ─────────────────────────────────────────────────────────────────────────
+
+// Holgura geométrica: deja respirar un poco cada dimensión del rectángulo
+// mínimo. Interpretación geométrica, no un porcentaje de superficie: 20 cm
+// pesan proporcionalmente mucho más en un aseo de 1,50×2,40 que en un estar.
+// NO garantiza el encaje —eso sólo lo decide fits()—; es una holgura mínima.
+const GEOM_CLEAR=0.20;
+const geomFloor=r=>(r.a+GEOM_CLEAR)*(r.b+GEOM_CLEAR);
+// Elegido por barrido sobre los siete escenarios: por debajo de 1,2 varios se
+// quedan sin cobertura estricta; a partir de 1,2 los resultados no cambian
+// (1,2, 1,6 y 2,0 son idénticos), señal de que el sobre deja de ser el
+// limitante y pasa a serlo la geometría. Más allá sería holgura sin efecto.
+const SEARCH_GAIN=1.2;
+
+function growth(rooms,A,relax){
+  const sm=rooms.reduce((s,r)=>s+minArea(r),0);
+  const base=Math.max(1.5,sm>0?1.35*A/sm:1.5);
+  return base*(relax||1);}
+
+// Sobre de búsqueda. Depende del tamaño de la planta y del escalón, NO de la
+// elasticidad del local. Un máximo escrito lo sustituye por completo.
+//
+// El escalón entra por UNA sola vía: growth(rooms, A, relax). Aquí no se vuelve
+// a aplicar. Antes había un tercer argumento y quien lo pasaba escalaba dos
+// veces: el metadato decía 33,18 m² donde el constructor usaba 20,03.
+function searchCap(r,f){
+  if(r.maxArea)return Math.max(r.maxArea,minArea(r));
+  const g=Math.max(1,f);
+  const search=minArea(r)*(1+SEARCH_GAIN*(g-1));
+  const cap=Math.max(geomFloor(r),search);
+  // El nexo se estira hasta donde la circulación exija: su banda tiene que
+  // poder atravesar la región.
+  return r.cat==='nexo'?Math.max(cap,minArea(r)*Math.min(2.2,g)):cap;}
+// nombre histórico, conservado para no romper llamadas
+const effMax=(r,f)=>searchCap(r,f);
+function preVivienda(){S.rooms.length=0;S.rel={};
+  addRoom('Estar–comedor','publico',4.2,5.2,0,{entry:'permitida'});
+  addRoom('Vestíbulo','nexo',1.6,3,0,{entry:'preferente'});
+  addRoom('Distribuidor','nexo',1.2,6,0);
+  addRoom('Cocina','servicio',2.6,4,0,{elast:80});
+  addRoom('Aseo','servicio',1.5,2.4,0,{elast:10});
+  addRoom('Baño','servicio',1.8,3,0,{elast:15});
+  addRoom('Dormitorio 1','privado',3,4.2,0);
+  addRoom('Dormitorio 2','privado',2.8,3.6,0);
+  addRoom('Dormitorio 3','privado',2.8,3.6,0);
+  setRel(0,3,'contiguo');
+  [6,7,8].forEach(d=>setRel(d,5,'proximo'));}
+function preOficina(){S.rooms.length=0;S.rel={};
+  addRoom('Recepción','publico',2.8,4.5,0,{entry:'preferente'});
+  addRoom('Sala común','publico',5,7,0);
+  addRoom('Reuniones','publico',3.4,5,0,{elast:70});
+  addRoom('Pasillo','nexo',1.3,8,0);
+  addRoom('Despacho 1','privado',2.8,4.4,0);
+  addRoom('Despacho 2','privado',2.8,4.4,0);
+  addRoom('Despacho 3','privado',2.6,4,0);
+  addRoom('Aseos','servicio',1.8,3.4,0,{elast:12});
+  addRoom('Almacén','servicio',2,3.4,0,{elast:25});
+  setRel(0,1,'contiguo');
+  [4,5,6].forEach(d=>setRel(d,7,'proximo'));}
+preOficina();
+
+/* ═════════ geometría ═════════ */
+const dist=(a,b)=>Math.hypot(b.x-a.x,b.y-a.y);
+// Holgura libre exigida en cada extremo de una puerta. Un único sitio donde se
+// define «cabe una puerta»: projPerim() y prechecks() usan la misma condición.
+const DOOR_END_CLEAR=0.02;
+const sideFitsDoor=(L,dW)=>L>=dW+2*DOOR_END_CLEAR;
+function syncSides(){
+  const n=S.closed?S.pts.length:Math.max(0,S.pts.length-1);
+  while(S.sides.length<n)S.sides.push({wall:'fachada',entry:true});
+  S.sides.length=n;}
+const sideAt=i=>S.sides[i]||{wall:'fachada',entry:true};
+function edgeIndexAt(p,tol){
+  const n=S.pts.length;let bi=-1,bd=tol===undefined?0.02:tol;
+  for(let i=0;i<n;i++){const a=S.pts[i],b=S.pts[(i+1)%n];
+    const dx=b.x-a.x,dy=b.y-a.y,L2=dx*dx+dy*dy||1;
+    let t=((p.x-a.x)*dx+(p.y-a.y)*dy)/L2;t=Math.max(0,Math.min(1,t));
+    const d=Math.hypot(a.x+dx*t-p.x,a.y+dy*t-p.y);
+    if(d<bd){bd=d;bi=i;}}
+  return bi;}
+// Parte un borde de local en los tramos reales del perímetro que lo contienen.
+// Un borde puede recorrer dos segmentos colineales con condiciones distintas
+// (fachada y medianera): clasificarlo entero por su punto medio era falso.
+function edgeFragments(e){
+  const out=[],n=S.pts.length;
+  const ex=e.x2-e.x1,ey=e.y2-e.y1,EL=Math.hypot(ex,ey);
+  if(EL<1e-9)return out;
+  const ux=ex/EL,uy=ey/EL;
+  for(let i=0;i<n;i++){
+    const a=S.pts[i],b=S.pts[(i+1)%n];
+    const sx=b.x-a.x,sy=b.y-a.y,SL=Math.hypot(sx,sy);
+    if(SL<1e-9)continue;
+    const vx=sx/SL,vy=sy/SL;
+    if(Math.abs(ux*vy-uy*vx)>1e-6)continue;                 // no son paralelos
+    if(Math.abs((a.x-e.x1)*uy-(a.y-e.y1)*ux)>2e-3)continue; // no son colineales
+    // solape en el parámetro del borde
+    let t0=(a.x-e.x1)*ux+(a.y-e.y1)*uy, t1=(b.x-e.x1)*ux+(b.y-e.y1)*uy;
+    if(t0>t1){const t=t0;t0=t1;t1=t;}
+    const lo=Math.max(0,t0),hi=Math.min(EL,t1);
+    if(hi-lo<1e-4)continue;
+    const sd=sideAt(i);
+    let nx=-vy,ny=vx;
+    const mx=e.x1+ux*(lo+hi)/2,my=e.y1+uy*(lo+hi)/2;
+    if(inPoly(mx+nx*0.08,my+ny*0.08,S.pts)){nx=-nx;ny=-ny;}
+    out.push({side:i,wall:sd.wall,entry:sd.entry,len:hi-lo,nx,ny,
+      x1:e.x1+ux*lo,y1:e.y1+uy*lo,x2:e.x1+ux*hi,y2:e.y1+uy*hi,
+      bearing:((S.north-Math.atan2(ny,nx)*180/Math.PI)%360+360)%360});}
+  // fusiona tramos contiguos de la misma condición para medir el continuo real
+  out.sort((p,q)=>((p.x1-e.x1)*ux+(p.y1-e.y1)*uy)-((q.x1-e.x1)*ux+(q.y1-e.y1)*uy));
+  const merged=[];
+  out.forEach(f=>{
+    const last=merged[merged.length-1];
+    if(last&&last.wall===f.wall&&last.entry===f.entry&&
+       Math.hypot(last.x2-f.x1,last.y2-f.y1)<1e-4){
+      last.x2=f.x2;last.y2=f.y2;last.len+=f.len;
+    }else merged.push({...f});});
+  return merged;}
+function area(p=S.pts){let s=0;for(let i=0,n=p.length;i<n;i++){const q=p[(i+1)%n];s+=p[i].x*q.y-q.x*p[i].y;}return Math.abs(s)/2;}
+function perim(p=S.pts){let s=0;for(let i=0,n=p.length;i<n;i++)s+=dist(p[i],p[(i+1)%n]);return s;}
+function inPoly(x,y,p){let c=false;for(let i=0,j=p.length-1;i<p.length;j=i++){const xi=p[i].x,yi=p[i].y,xj=p[j].x,yj=p[j].y;
+  if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi))c=!c;}return c;}
+function bboxOf(p){let a=1e9,b=1e9,c=-1e9,d=-1e9;for(const v of p){a=Math.min(a,v.x);b=Math.min(b,v.y);c=Math.max(c,v.x);d=Math.max(d,v.y);}return{x0:a,y0:b,x1:c,y1:d};}
+// Proyecta sobre el perímetro. Con onlyEntry, sólo sobre los lados que admiten
+// entrada: así el marcador no queda sobre una medianera y el usuario no cree
+// que el programa ha ignorado su punto.
+// Proyecta un punto sobre el perímetro. Con onlyEntry, SÓLO sobre los lados que
+// son fachada y admiten entrada; si no hay ninguno devuelve null, y prechecks()
+// se encarga de explicarlo. Sin fallback silencioso: el marcador nunca debe
+// quedar sobre una medianera prometiendo una entrada que no existe.
+function projPerim(p,onlyEntry){let best=null,bd=1e9,n=S.pts.length;
+  syncSides();
+  // una puerta no cabe en una esquina: con onlyEntry se reserva medio paso de
+  // puerta en cada extremo y se descartan los lados demasiado cortos.
+  const dW=onlyEntry?(parseFloat($('#door').value)||0.85):0;
+  for(let i=0;i<n;i++){
+    if(onlyEntry){const sd=sideAt(i);if(sd.wall!=='fachada'||!sd.entry)continue;}
+    const a=S.pts[i],b=S.pts[(i+1)%n];
+    const dx=b.x-a.x,dy=b.y-a.y,L2=dx*dx+dy*dy||1;
+    const LL=Math.sqrt(L2);
+    if(onlyEntry&&!sideFitsDoor(LL,dW))continue;
+    const m=onlyEntry?(dW/2+DOOR_END_CLEAR)/LL:0;
+    let t=((p.x-a.x)*dx+(p.y-a.y)*dy)/L2;t=Math.max(m,Math.min(1-m,t));
+    const q={x:a.x+dx*t,y:a.y+dy*t},d=dist(q,p);if(d<bd){bd=d;best=q;}}
+  return best;}
+// Reposiciona el marcador de acceso sobre un lado admisible. Si no queda
+// ninguno, lo deja donde estaba para que el aviso previo sea el que hable.
+function reprojectDoor(){
+  if(!S.closed||!S.pts.length)return;
+  const ref=S.door||{x:S.pts[0].x,y:S.pts[0].y};
+  const q=projPerim(ref,true);
+  S.door=q||projPerim(ref)||ref;
+  S.doorOnValidSide=!!q;}
+function mulberry(seed){let a=seed>>>0;return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296;};}
+
+/* ═════════ vista ═════════ */
+const cv=$('#cv'),stage=$('#stage');
+const V={k:26,cx:5,cy:0};
+let CW=0,CH=0,DPR=1;
+const SX=x=>(x-V.cx)*V.k+CW/2, SY=y=>CH/2-(y-V.cy)*V.k;
+const WX=sx=>(sx-CW/2)/V.k+V.cx, WY=sy=>(CH/2-sy)/V.k+V.cy;
+function resize(){DPR=window.devicePixelRatio||1;CW=stage.clientWidth;CH=stage.clientHeight;
+  cv.width=Math.round(CW*DPR);cv.height=Math.round(CH*DPR);draw();}
+function fitView(){
+  if(!S.pts.length)return;
+  const b=bboxOf(S.pts),w=Math.max(b.x1-b.x0,1),h=Math.max(b.y1-b.y0,1);
+  V.k=Math.min(CW/w,CH/h)*0.78;V.cx=(b.x0+b.x1)/2;V.cy=(b.y0+b.y1)/2;
+  draw();updateScalebar();}
+stage.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const wx=WX(e.offsetX),wy=WY(e.offsetY);
+  V.k=Math.max(3,Math.min(400,V.k*Math.exp(-e.deltaY*0.0016)));
+  V.cx=wx-(e.offsetX-CW/2)/V.k;V.cy=wy+(e.offsetY-CH/2)/V.k;
+  draw();updateScalebar();},{passive:false});
+function updateScalebar(){
+  const m=[0.5,1,2,5,10,20,50,100].find(t=>t*V.k>70)||100;
+  $('#scalebar').innerHTML=`<span class="bar" style="width:${(m*V.k).toFixed(0)}px"></span>${nf(m,m<1?2:0)} m`;}
+
+/* ═════════ dibujo ═════════ */
+function roomColor(i,cat){
+  const r=S.rooms[i];
+  if(!r)return 'hsl(30 6% 91%)';
+  const c=CATS[r.cat],fam=S.rooms.filter(x=>x.cat===r.cat),pos=fam.indexOf(r);
+  const t=fam.length>1?pos/(fam.length-1):0.5;
+  return `hsl(${(c.h+(t-0.5)*26).toFixed(0)} ${(c.s*(0.72+0.5*t)).toFixed(0)}% ${(84-t*22).toFixed(0)}%)`;
+}
+function draw(){
+  const g=cv.getContext('2d');
+  g.setTransform(DPR,0,0,DPR,0,0);
+  g.clearRect(0,0,CW,CH);
+  drawGrid(g);
+  const opt=(S.tab===2&&S.sel>=0)?S.options[S.sel]:null;
+  if(opt){drawRooms(g,opt);drawDoors(g,opt);}
+  drawShape(g,!opt);
+  if(opt)drawLabels(g,opt);
+  drawDoorMark(g);
+  drawNorth(g);
+}
+function drawGrid(g){
+  const mod=parseFloat($('#snap').value);
+  let step=mod;while(step*V.k<7)step*=(step*V.k<3?10:5);
+  const x0=WX(0),x1=WX(CW),y0=WY(CH),y1=WY(0);
+  g.lineWidth=1;
+  for(let x=Math.floor(x0/step)*step;x<=x1;x+=step){
+    const heavy=Math.abs(x/(step*5)-Math.round(x/(step*5)))<1e-6;
+    g.strokeStyle=Math.abs(x)<1e-9?'#C6CFD6':(heavy?'#DFE6EA':'#F0F3F5');
+    const sx=Math.round(SX(x))+.5;g.beginPath();g.moveTo(sx,0);g.lineTo(sx,CH);g.stroke();}
+  for(let y=Math.floor(y0/step)*step;y<=y1;y+=step){
+    const heavy=Math.abs(y/(step*5)-Math.round(y/(step*5)))<1e-6;
+    g.strokeStyle=Math.abs(y)<1e-9?'#C6CFD6':(heavy?'#DFE6EA':'#F0F3F5');
+    const sy=Math.round(SY(y))+.5;g.beginPath();g.moveTo(0,sy);g.lineTo(CW,sy);g.stroke();}
+}
+function drawShape(g,fill){
+  if(!S.pts.length)return;
+  const n=S.pts.length;
+  g.beginPath();
+  S.pts.forEach((p,i)=>i?g.lineTo(SX(p.x),SY(p.y)):g.moveTo(SX(p.x),SY(p.y)));
+  if(S.closed)g.closePath();
+  if(S.closed&&fill){g.fillStyle='rgba(15,23,32,.05)';g.fill();}
+  syncSides();
+  const last0=S.closed?n:n-1;
+  for(let i=0;i<last0;i++){
+    const a=S.pts[i],b=S.pts[(i+1)%n],sd=sideAt(i);
+    const med=sd.wall==='medianera';
+    g.strokeStyle='#0F1720';g.lineWidth=med?6:2.6;
+    g.beginPath();g.moveTo(SX(a.x),SY(a.y));g.lineTo(SX(b.x),SY(b.y));g.stroke();
+    if(med){                                  // rayado de medianera
+      const L=dist(a,b)||1,ux=(b.x-a.x)/L,uy=(b.y-a.y)/L;
+      let nx=-uy,ny=ux;
+      if(!inPoly((a.x+b.x)/2+nx*0.1,(a.y+b.y)/2+ny*0.1,S.pts)){nx=-nx;ny=-ny;}
+      g.strokeStyle='#fff';g.lineWidth=1.2;
+      for(let t=0.12;t<L;t+=Math.max(0.28,14/V.k)){
+        const px=a.x+ux*t,py=a.y+uy*t;
+        g.beginPath();
+        g.moveTo(SX(px),SY(py));
+        g.lineTo(SX(px+nx*0.10+ux*0.10),SY(py+ny*0.10+uy*0.10));g.stroke();}
+    }
+    if(!sd.entry&&!med){                      // fachada sin acceso: punteado interior
+      const L=dist(a,b)||1,ux=(b.x-a.x)/L,uy=(b.y-a.y)/L;
+      let nx=-uy,ny=ux;
+      if(!inPoly((a.x+b.x)/2+nx*0.1,(a.y+b.y)/2+ny*0.1,S.pts)){nx=-nx;ny=-ny;}
+      g.save();g.setLineDash([3,4]);g.strokeStyle='#B0341F';g.lineWidth=1.4;
+      g.beginPath();
+      g.moveTo(SX(a.x+nx*0.16),SY(a.y+ny*0.16));
+      g.lineTo(SX(b.x+nx*0.16),SY(b.y+ny*0.16));g.stroke();g.restore();}
+  }
+  if(!S.closed){g.strokeStyle='#0F1720';g.lineWidth=2.6;
+    g.beginPath();S.pts.forEach((p,i)=>i?g.lineTo(SX(p.x),SY(p.y)):g.moveTo(SX(p.x),SY(p.y)));g.stroke();}
+  if(S.hoverEdge>=0&&S.hoverEdge<(S.closed?n:n-1)){
+    const a=S.pts[S.hoverEdge],b=S.pts[(S.hoverEdge+1)%n];
+    g.strokeStyle='#B0341F';g.lineWidth=4;
+    g.beginPath();g.moveTo(SX(a.x),SY(a.y));g.lineTo(SX(b.x),SY(b.y));g.stroke();}
+  const last=S.closed?n:n-1;
+  g.font='11px ui-monospace,Menlo,monospace';g.textAlign='center';g.textBaseline='middle';
+  for(let i=0;i<last;i++){
+    const a=S.pts[i],b=S.pts[(i+1)%n],L=dist(a,b);if(L*V.k<26)continue;
+    const mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+    let nx=-(b.y-a.y)/L,ny=(b.x-a.x)/L;
+    if(S.closed&&inPoly(mx+nx*0.12,my+ny*0.12,S.pts)){nx=-nx;ny=-ny;}
+    const px=SX(mx+nx*18/V.k),py=SY(my+ny*18/V.k),txt=nf(L,2),w=g.measureText(txt).width;
+    g.fillStyle='rgba(255,255,255,.92)';g.fillRect(px-w/2-4,py-8,w+8,16);
+    g.fillStyle=(i===S.hoverEdge)?'#B0341F':'#5B6771';g.fillText(txt,px,py);}
+  if(S.drawing&&S.cursor&&S.pts.length){
+    const l=S.pts[S.pts.length-1];let q=snapPt(S.cursor);
+    if($('#ortho').checked){if(Math.abs(q.x-l.x)>Math.abs(q.y-l.y))q.y=l.y;else q.x=l.x;}
+    g.save();g.setLineDash([5,4]);g.strokeStyle='#B0341F';g.lineWidth=1.6;
+    g.beginPath();g.moveTo(SX(l.x),SY(l.y));g.lineTo(SX(q.x),SY(q.y));g.stroke();g.restore();
+    const L=dist(l,q);
+    if(L>0.01){const txt=nf(L,2),w=g.measureText(txt).width;
+      const px=SX((l.x+q.x)/2),py=SY((l.y+q.y)/2)-14;
+      g.fillStyle='rgba(255,255,255,.94)';g.fillRect(px-w/2-4,py-8,w+8,16);
+      g.fillStyle='#B0341F';g.fillText(txt,px,py);}}
+  S.pts.forEach((p,i)=>{
+    g.fillStyle=(i===0&&!S.closed)?'#B0341F':'#0F1720';
+    g.beginPath();g.arc(SX(p.x),SY(p.y),i===S.dragV?5:3.4,0,7);g.fill();});
+}
+function drawRooms(g,opt){
+  opt.rooms.forEach(r=>{
+    g.fillStyle=roomColor(r.i,r.cat);
+    r.rects.forEach(R=>g.fillRect(SX(R.x)-.4,SY(R.y+R.h)-.4,R.w*V.k+.8,R.h*V.k+.8));
+  });
+  g.strokeStyle='#0F1720';g.lineWidth=1.5;g.lineCap='square';
+  opt.rooms.forEach(r=>{
+    g.beginPath();
+    r.edges.forEach(e=>{g.moveTo(SX(e.x1),SY(e.y1));g.lineTo(SX(e.x2),SY(e.y2));});
+    g.stroke();
+  });
+}
+function drawDoors(g,opt){
+  opt.doors.forEach(d=>{
+    const q=doorParts(d);if(!q)return;
+    g.strokeStyle='#fff';g.lineWidth=4;g.lineCap='butt';
+    g.beginPath();g.moveTo(SX(q.p1.x),SY(q.p1.y));g.lineTo(SX(q.p2.x),SY(q.p2.y));g.stroke();
+    if(q.L*V.k<10)return;
+    g.strokeStyle='rgba(15,23,32,.55)';g.lineWidth=1.1;
+    g.beginPath();g.moveTo(SX(q.p1.x),SY(q.p1.y));g.lineTo(SX(q.end.x),SY(q.end.y));g.stroke();
+    g.beginPath();q.arc.forEach((p,i)=>i?g.lineTo(SX(p.x),SY(p.y)):g.moveTo(SX(p.x),SY(p.y)));g.stroke();
+  });
+}
+function drawLabels(g,opt){
+  g.textAlign='center';g.textBaseline='middle';
+  opt.rooms.forEach(r=>{
+    const R=r.rects.reduce((a,b)=>a.w*a.h>b.w*b.h?a:b);
+    const px=SX(R.x+R.w/2),py=SY(R.y+R.h/2);
+    const wpx=R.w*V.k,hpx=R.h*V.k;
+    if(wpx<46||hpx<14)return;
+    const name=r.name.toUpperCase();
+    g.font='600 12px system-ui,sans-serif';
+    const fits1=g.measureText(name).width<wpx-8;
+    const dims=nf(r.w,2)+' × '+nf(r.h,2),sup=nf(r.area,1)+' m²';
+    g.font='11px ui-monospace,Menlo,monospace';
+    const wd=Math.max(g.measureText(dims).width,g.measureText(sup).width)<wpx-8;
+    if(hpx>=46&&fits1&&wd){
+      g.font='600 12px system-ui,sans-serif';g.fillStyle='#0F1720';g.fillText(name,px,py-13);
+      g.font='11px ui-monospace,Menlo,monospace';g.fillStyle=r.ok?'#5B6771':'#B0341F';
+      g.fillText(dims,px,py+1);
+      g.fillStyle=r.inRange?'#5B6771':'#B0341F';g.fillText(sup,px,py+15);
+    }else if(hpx>=30&&fits1&&wd){
+      g.font='600 11px system-ui,sans-serif';g.fillStyle='#0F1720';g.fillText(name,px,py-7);
+      g.font='10px ui-monospace,Menlo,monospace';g.fillStyle=r.inRange?'#5B6771':'#B0341F';
+      g.fillText(sup,px,py+7);
+    }else if(fits1){
+      g.font='600 11px system-ui,sans-serif';g.fillStyle='#0F1720';g.fillText(name,px,py);
+    }
+  });
+}
+function facadeDir(p){
+  const n=S.pts.length;let bd=1e9,dir={x:1,y:0};
+  for(let i=0;i<n;i++){const a=S.pts[i],b=S.pts[(i+1)%n];
+    const dx=b.x-a.x,dy=b.y-a.y,L2=dx*dx+dy*dy||1;
+    let t=((p.x-a.x)*dx+(p.y-a.y)*dy)/L2;t=Math.max(0,Math.min(1,t));
+    const d=Math.hypot(a.x+dx*t-p.x,a.y+dy*t-p.y);
+    if(d<bd){bd=d;const L=Math.sqrt(L2);dir={x:dx/L,y:dy/L};}}
+  return dir;}
+function drawNorth(g){
+  const cx=CW-58,cy=64,r=20,a=(90-S.north)*Math.PI/180;
+  g.save();
+  g.fillStyle='rgba(255,255,255,.86)';g.strokeStyle='#C6CFD6';g.lineWidth=1;
+  g.beginPath();g.arc(cx,cy,r+7,0,7);g.fill();g.stroke();
+  g.strokeStyle='#5B6771';g.lineWidth=1;
+  g.beginPath();g.arc(cx,cy,r,0,7);g.stroke();
+  const tip={x:cx+Math.cos(a-Math.PI/2)*r,y:cy+Math.sin(a-Math.PI/2)*r};
+  g.strokeStyle='#B0341F';g.lineWidth=2;
+  g.beginPath();g.moveTo(cx-(tip.x-cx)*0.6,cy-(tip.y-cy)*0.6);g.lineTo(tip.x,tip.y);g.stroke();
+  g.fillStyle='#B0341F';g.font='600 11px system-ui,sans-serif';
+  g.textAlign='center';g.textBaseline='middle';
+  g.fillText('N',cx+(tip.x-cx)*1.32,cy+(tip.y-cy)*1.32);
+  g.restore();}
+function drawDoorMark(g){
+  const opt=(S.tab===2&&S.sel>=0)?S.options[S.sel]:null;
+  if(opt&&opt.entrance){
+    const e=opt.entrance,w=parseFloat($('#door').value)||0.85;
+    g.strokeStyle='#fff';g.lineWidth=5.5;
+    g.beginPath();
+    g.moveTo(SX(e.p.x-e.dir.x*w/2),SY(e.p.y-e.dir.y*w/2));
+    g.lineTo(SX(e.p.x+e.dir.x*w/2),SY(e.p.y+e.dir.y*w/2));g.stroke();
+    let nx=-e.dir.y,ny=e.dir.x;
+    if(!inPoly(e.p.x+nx*0.3,e.p.y+ny*0.3,S.pts)){nx=-nx;ny=-ny;}
+    const tip={x:e.p.x+nx*0.95,y:e.p.y+ny*0.95};
+    g.strokeStyle='#B0341F';g.lineWidth=2;
+    g.beginPath();
+    g.moveTo(SX(e.p.x-nx*0.55),SY(e.p.y-ny*0.55));g.lineTo(SX(tip.x),SY(tip.y));
+    g.moveTo(SX(tip.x-nx*0.38-e.dir.x*0.26),SY(tip.y-ny*0.38-e.dir.y*0.26));
+    g.lineTo(SX(tip.x),SY(tip.y));
+    g.lineTo(SX(tip.x-nx*0.38+e.dir.x*0.26),SY(tip.y-ny*0.38+e.dir.y*0.26));
+    g.stroke();
+    return;
+  }
+  if(!S.door)return;
+  const px=SX(S.door.x),py=SY(S.door.y);
+  g.strokeStyle=S.doorOnValidSide===false?'#98A3AC':'#B0341F';g.lineWidth=2.4;
+  if(S.doorOnValidSide===false)g.setLineDash([4,3]);
+  g.beginPath();g.arc(px,py,9,0,7);g.stroke();g.setLineDash([]);
+  g.lineWidth=1.2;g.beginPath();
+  g.moveTo(px-13,py);g.lineTo(px+13,py);g.moveTo(px,py-13);g.lineTo(px,py+13);g.stroke();}
+
+/* ═════════ interacción ═════════ */
+let pan=null,space=false;
+function evXY(e){const r=cv.getBoundingClientRect();return{sx:e.clientX-r.left,sy:e.clientY-r.top};}
+function snapv(){return parseFloat($('#snap').value);}
+function snapPt(p){const s=snapv();return{x:Math.round(p.x/s)*s,y:Math.round(p.y/s)*s};}
+function hitVertex(sx,sy){for(let i=0;i<S.pts.length;i++)if(Math.hypot(SX(S.pts[i].x)-sx,SY(S.pts[i].y)-sy)<9)return i;return -1;}
+function hitEdge(sx,sy){
+  const n=S.pts.length,last=S.closed?n:n-1;
+  for(let i=0;i<last;i++){
+    const a=S.pts[i],b=S.pts[(i+1)%n];
+    const ax=SX(a.x),ay=SY(a.y),bx=SX(b.x),by=SY(b.y);
+    const dx=bx-ax,dy=by-ay,L2=dx*dx+dy*dy||1;
+    let t=((sx-ax)*dx+(sy-ay)*dy)/L2;if(t<0.05||t>0.95)continue;
+    if(Math.hypot(ax+dx*t-sx,ay+dy*t-sy)<7)return i;}
+  return -1;}
+stage.addEventListener('pointermove',e=>{
+  const {sx,sy}=evXY(e);
+  $('#coords').textContent=nf(WX(sx),2)+' , '+nf(WY(sy),2);
+  if(pan){V.cx=pan.cx-(sx-pan.sx)/V.k;V.cy=pan.cy+(sy-pan.sy)/V.k;draw();return;}
+  if(S.drawing){S.cursor={x:WX(sx),y:WY(sy)};draw();return;}
+  if(S.dragV>=0){moveVertex(S.dragV,snapPt({x:WX(sx),y:WY(sy)}));return;}
+  if(S.dragE>=0){moveEdge(S.dragE,{x:WX(sx),y:WY(sy)});return;}
+  if(S.closed){
+    const h=hitEdge(sx,sy);
+    if(h!==S.hoverEdge){S.hoverEdge=h;highlightRow(h);draw();}
+    stage.style.cursor=hitVertex(sx,sy)>=0?'move':(h>=0?'move':'crosshair');}
+});
+stage.addEventListener('pointerdown',e=>{
+  const {sx,sy}=evXY(e);
+  if(e.button===2||space){pan={sx,sy,cx:V.cx,cy:V.cy};stage.classList.add('panning');return;}
+  if(S.doorMode&&S.closed){const q=projPerim({x:WX(sx),y:WY(sy)},true);
+    if(q){S.door=q;S.doorOnValidSide=true;}S.doorMode=false;
+    $('#bDoor').classList.remove('on');afterGeometryChange();return;}
+  if(S.drawing){addPoint({x:WX(sx),y:WY(sy)},sx,sy);return;}
+  if(S.closed){
+    const v=hitVertex(sx,sy);if(v>=0){S.dragV=v;cv.setPointerCapture(e.pointerId);return;}
+    const ed=hitEdge(sx,sy);
+    if(ed>=0){S.dragE=ed;S.dragRef={a:{...S.pts[ed]},b:{...S.pts[(ed+1)%S.pts.length]}};cv.setPointerCapture(e.pointerId);return;}
+    pan={sx,sy,cx:V.cx,cy:V.cy};stage.classList.add('panning');}
+});
+window.addEventListener('pointerup',()=>{
+  if(S.dragV>=0||S.dragE>=0){S.dragV=-1;S.dragE=-1;afterGeometryChange();}
+  pan=null;stage.classList.remove('panning');});
+stage.addEventListener('contextmenu',e=>e.preventDefault());
+window.addEventListener('keydown',e=>{
+  const tg=e.target&&e.target.tagName;
+  if(tg==='INPUT'||tg==='SELECT'||tg==='TEXTAREA')return;
+  if(e.code==='Space'){space=true;e.preventDefault();}
+  if(e.key==='Enter'&&S.drawing)closeShape();
+  if(e.key==='Escape'&&S.drawing){S.pts.pop();draw();refreshEdges();}
+  if(S.tab===2&&S.options.length){
+    if(e.key==='ArrowRight'){S.sel=(S.sel+1)%S.options.length;renderResults();refreshTotals();draw();}
+    if(e.key==='ArrowLeft'){S.sel=(S.sel-1+S.options.length)%S.options.length;renderResults();refreshTotals();draw();}}
+});
+window.addEventListener('keyup',e=>{if(e.code==='Space')space=false;});
+function addPoint(p,sx,sy){
+  let q=snapPt(p);
+  if(S.pts.length&&$('#ortho').checked){
+    const l=S.pts[S.pts.length-1];
+    if(Math.abs(q.x-l.x)>Math.abs(q.y-l.y))q.y=l.y;else q.x=l.x;}
+  if(S.pts.length>2&&Math.hypot(SX(S.pts[0].x)-sx,SY(S.pts[0].y)-sy)<11){closeShape();return;}
+  if(S.pts.length&&dist(q,S.pts[S.pts.length-1])<1e-9)return;
+  S.pts.push(q);draw();refreshEdges();}
+function moveVertex(i,q){
+  const n=S.pts.length;
+  if($('#ortho').checked){
+    const prev=S.pts[(i-1+n)%n],next=S.pts[(i+1)%n],cur=S.pts[i];
+    const dx=q.x-cur.x,dy=q.y-cur.y;
+    if(Math.abs(prev.x-cur.x)<1e-6)prev.x+=dx;else prev.y+=dy;
+    if(Math.abs(next.x-cur.x)<1e-6)next.x+=dx;else next.y+=dy;}
+  S.pts[i]=q;draw();refreshEdges();}
+function moveEdge(i,p){
+  const n=S.pts.length,a=S.dragRef.a,b=S.dragRef.b;
+  const L=dist(a,b)||1,ux=(b.x-a.x)/L,uy=(b.y-a.y)/L,nx=-uy,ny=ux;
+  const d=(p.x-a.x)*nx+(p.y-a.y)*ny,s=snapv(),dd=Math.round(d/s)*s;
+  S.pts[i]={x:a.x+nx*dd,y:a.y+ny*dd};
+  S.pts[(i+1)%n]={x:b.x+nx*dd,y:b.y+ny*dd};
+  draw();refreshEdges();}
+function closeShape(){
+  if(S.pts.length<3)return;
+  if($('#ortho').checked){
+    const a=S.pts[S.pts.length-1],b=S.pts[0];
+    if(Math.abs(a.x-b.x)>1e-6&&Math.abs(a.y-b.y)>1e-6){
+      const prev=S.pts[S.pts.length-2];
+      if(Math.abs(prev.y-a.y)<1e-6)S.pts.push({x:a.x,y:b.y});
+      else S.pts.push({x:b.x,y:a.y});}}
+  S.closed=true;S.drawing=false;S.cursor=null;$('#bDraw').classList.remove('on');
+  reprojectDoor();
+  afterGeometryChange();}
+// Dos operaciones distintas, y no deben confundirse:
+//
+//  invalidate()          → los resultados siguen siendo legibles pero ya no
+//                          corresponden a los datos actuales. Se conservan y se
+//                          marcan como caducados. Es lo que quieres cuando el
+//                          usuario retoca un parámetro y aún mira la planta.
+//
+//  resetComputedState()  → los resultados dejan de tener sentido por completo
+//                          (otra geometría, otro programa). Se borra TODO el
+//                          estado derivado, incluido el pool desde el que se
+//                          rehace la selección: si sobrevive, las plantas viejas
+//                          resucitan sobre la planta nueva sin avisar.
+function invalidate(reason){
+  if(S.options.length){S.stale=S.stale||reason||'los datos han cambiado';}
+  renderResults();draw();}
+function resetComputedState(){
+  S.options=[];S.pool=null;S.sel=-1;S.stale=null;S.searched=false;
+  S.hasValid=false;S.hasStrict=false;
+  S.blockers=null;S.outOfScope=null;S.fails=null;S.culprits=null;S.yielded=null;}
+function afterGeometryChange(){
+  resetComputedState();
+  reprojectDoor();
+  draw();refreshEdges();refreshTotals();renderResults();hint();}
+function setEdge(i,newLen){
+  const n=S.pts.length,a=S.pts[i],b=S.pts[(i+1)%n];
+  const L=dist(a,b);if(L<1e-9||!(newLen>0))return;
+  const ux=(b.x-a.x)/L,uy=(b.y-a.y)/L,dx=ux*(newLen-L),dy=uy*(newLen-L);
+  const j=(i+1)%n,k=(i+2)%n;
+  const nb={x:S.pts[j].x+dx,y:S.pts[j].y+dy},nc={x:S.pts[k].x+dx,y:S.pts[k].y+dy};
+  if(n>3&&dist(nc,S.pts[(i+3)%n])<0.1){msg('El lado siguiente se quedaría sin longitud.');refreshEdges();return;}
+  S.pts[j]=nb;S.pts[k]=nc;msg('');afterGeometryChange();}
+function msg(t){$('#pmsg').innerHTML=t?`<div class="msg">${t}</div>`:'';}
+function highlightRow(i){document.querySelectorAll('#edges tr').forEach((tr,k)=>tr.classList.toggle('hi',k===i));}
+function refreshEdges(){
+  const t=$('#edges');t.innerHTML='';
+  syncSides();
+  if(!S.pts.length){$('#area').textContent='—';$('#peri').textContent='—';return;}
+  const n=S.pts.length,last=S.closed?n:n-1;
+  for(let i=0;i<last;i++){
+    const a=S.pts[i],b=S.pts[(i+1)%n],L=dist(a,b);
+    const d=Math.abs(b.y-a.y)<1e-6?(b.x>a.x?'→':'←'):(Math.abs(b.x-a.x)<1e-6?(b.y>a.y?'↑':'↓'):'∠');
+    const tr=document.createElement('tr');
+    const sd=sideAt(i);
+    tr.innerHTML=`<td class="d">${d}</td><td class="l">${String(i+1).padStart(2,'0')}</td>
+      <td><input type="number" step="0.05" min="0.1" value="${L.toFixed(2)}"></td>
+      <td class="l">m</td>
+      <td style="width:34px"><button class="tag ${sd.wall==='medianera'?'med':''}" title="fachada / medianera">${sd.wall==='medianera'?'MED':'FAC'}</button></td>
+      <td style="width:22px"><button class="tag ${sd.entry?'':'no'}" title="admite entrada">${sd.entry?'⌷':'✕'}</button></td>`;
+    tr.querySelector('input').addEventListener('change',e=>setEdge(i,parseFloat(e.target.value)));
+    const tags=tr.querySelectorAll('.tag');
+    tags[0].onclick=()=>{const q=sideAt(i);q.wall=q.wall==='medianera'?'fachada':'medianera';
+      if(q.wall==='medianera')q.entry=false;afterGeometryChange();};
+    tags[1].onclick=()=>{const q=sideAt(i);
+      if(q.wall==='medianera')return;q.entry=!q.entry;afterGeometryChange();};
+    tr.addEventListener('mouseenter',()=>{S.hoverEdge=i;highlightRow(i);draw();});
+    tr.addEventListener('mouseleave',()=>{S.hoverEdge=-1;highlightRow(-1);draw();});
+    t.appendChild(tr);}
+  $('#area').textContent=S.closed?nf(area(),2)+' m²':'—';
+  $('#peri').textContent=S.closed?nf(perim(),2)+' m':'abierta';
+  if(S.hoverEdge>=0)highlightRow(S.hoverEdge);}
+
+/* ═════════ botones ═════════ */
+$('#bDraw').onclick=()=>{resetComputedState();S.pts=[];S.sides=[];S.closed=false;S.drawing=true;S.door=null;
+  $('#bDraw').classList.add('on');draw();refreshEdges();renderResults();hint();};
+$('#bCloseShape').onclick=closeShape;
+$('#bUndo').onclick=()=>{if(S.drawing){S.pts.pop();draw();refreshEdges();}};
+$('#bDoor').onclick=()=>{S.doorMode=!S.doorMode;$('#bDoor').classList.toggle('on',S.doorMode);};
+$('#bFit').onclick=fitView;
+$('#bPanel').onclick=()=>{$('#panel').classList.toggle('hide');setTimeout(resize,10);};
+$('#bImport').onclick=()=>$('#file').click();
+$('#file').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{try{
+    const d=JSON.parse(r.result),v=d.vertices||d.pts||d;
+    if(!Array.isArray(v)||v.length<3)throw 0;
+    S.pts=v.map(p=>Array.isArray(p)?{x:+p[0],y:+p[1]}:{x:+p.x,y:+p.y});
+    // el contorno nuevo NO hereda por posición las condiciones del anterior,
+    // ni los resultados calculados para el contorno viejo
+    resetComputedState();
+    S.sides=[];S.door=null;syncSides();
+    if(Array.isArray(d.lados_condicion)&&d.lados_condicion.length===S.pts.length)
+      d.lados_condicion.forEach((c,i)=>{S.sides[i]={wall:c.wall||'fachada',entry:c.entry!==false};});
+    S.closed=true;S.drawing=false;
+    S.door=null;reprojectDoor();
+    afterGeometryChange();fitView();
+  }catch(err){msg('No he podido leer ese archivo. Espero un JSON con una lista «vertices» de pares [x,y].');}};
+  r.readAsText(f);e.target.value='';};
+$('#north').oninput=e=>{S.north=parseInt(e.target.value);$('#vNorth').textContent=S.north+'°';invalidate('has girado el norte');draw();};
+$('#ortho').onchange=draw;
+$('#snap').onchange=draw;
+$('#t1').onclick=()=>setTab(1);
+$('#t2').onclick=()=>setTab(2);
+function setTab(t){
+  S.tab=t;
+  $('#t1').classList.toggle('on',t===1);$('#t2').classList.toggle('on',t===2);
+  $('#p1').classList.toggle('off',t!==1);$('#p2').classList.toggle('off',t!==2);
+  $('#legend').style.display=(t===2&&S.sel>=0)?'flex':'none';
+  hint();draw();}
+function hint(){
+  $('#hint').innerHTML=S.drawing
+   ? 'Clic para colocar vértices · <kbd>Intro</kbd> o clic en el primer punto: cerrar · <kbd>Esc</kbd>: quitar el último'
+   : (S.tab===1
+      ? 'Arrastra un vértice o un lado · rueda: zoom · <kbd>espacio</kbd> o botón derecho: mover'
+      : (S.options.length?'<kbd>←</kbd> <kbd>→</kbd> para pasar de una opción a otra':'Define el programa y pulsa «Generar distribuciones»'));}
+
+/* ═════════ programa ═════════ */
+function renderRooms(){
+  const box=$('#locales');box.innerHTML='';
+  const GFV=S.closed?growth(S.rooms,area()):1.5;
+  const DIRLIST=['','N','NE','E','SE','S','SO','O','NO'];
+  S.rooms.forEach((r,i)=>{
+    const el=document.createElement('div');el.className='local';el.style.borderLeftColor=roomColor(i,r.cat);
+    el.innerHTML=`<div class="l1"><span class="nn">${String(i+1).padStart(2,'0')}</span>
+        <input class="name" type="text" value="${r.name.replace(/"/g,'&quot;')}">
+        <select class="cat">${CATORDER.map(c=>`<option value="${c}" ${c===r.cat?'selected':''}>${CATS[c].label}</option>`).join('')}</select>
+        <button class="x" title="quitar">×</button></div>
+      <div class="l2">
+        <label class="fld"><span>lado a</span><input class="num ia" type="number" step="0.1" min="0.6" value="${r.a}"></label>
+        <label class="fld"><span>lado b</span><input class="num ib" type="number" step="0.1" min="0.6" value="${r.b}"></label>
+        <span class="calc">mínimo <b>${nf(minArea(r),2)}</b> m²</span>
+      </div>
+      <div class="l3">
+        <label class="fld" title="Máximo del programa. En blanco, el local no tiene tope arquitectónico; el motor usa internamente un sobre de búsqueda, que no es una condición del proyecto."><span>máx m²</span><input class="num imx" type="number" step="0.5" min="0" value="${r.maxArea||''}" placeholder="sin tope"></label>
+        <span class="calc asg" data-i="${i}" title="sobre de búsqueda interno: ${nf(searchCap(Object.assign({},r,{maxArea:0}),GFV),1)} m²">—</span>
+      </div>
+      <div class="l4">
+        <label class="fld"><span>elast</span><input class="num iel" type="number" step="5" min="0" max="200" value="${r.elast}"></label>
+        <label class="fld"><span>entrada</span><select class="ien">
+          ${['prohibida','permitida','preferente','obligatoria'].map(v=>`<option value="${v}" ${v===r.entry?'selected':''}>${v.slice(0,4)}</option>`).join('')}</select></label>
+        <label class="fld"><span>abre a</span><select class="iop">
+          <option value="libre" ${r.open==='libre'?'selected':''}>libre</option>
+          <option value="pref" ${r.open==='pref'?'selected':''}>nexo pref.</option>
+          <option value="nexo" ${r.open==='nexo'?'selected':''}>sólo nexo</option></select></label>
+        <label class="fld"><span>orient</span><select class="ior">
+          ${DIRLIST.map(v=>`<option value="${v}" ${v===r.orient?'selected':''}>${v||'—'}</option>`).join('')}</select></label>
+      </div>
+      <div class="l5"><span class="rlab">relaciones</span><span class="rels"></span>
+        <button class="addrel" title="añadir relación">+</button></div>`;
+    el.querySelector('.name').onchange=e=>{r.name=e.target.value;renderResults();};
+    el.querySelector('.ia').onchange=e=>{r.a=Math.max(0.6,parseFloat(e.target.value)||1);invalidate('has cambiado los lados de un local');renderRooms();};
+    el.querySelector('.ib').onchange=e=>{r.b=Math.max(0.6,parseFloat(e.target.value)||1);invalidate('has cambiado los lados de un local');renderRooms();};
+    el.querySelector('.imx').onchange=e=>{const v=parseFloat(e.target.value);r.maxArea=(isNaN(v)||v<=0)?0:v;invalidate('has cambiado un máximo');refreshTotals();};
+    el.querySelector('.iel').onchange=e=>{r.elast=Math.max(0,parseFloat(e.target.value)||0);invalidate('has cambiado una elasticidad');refreshTotals();};
+    el.querySelector('.ien').onchange=e=>{r.entry=e.target.value;invalidate('has cambiado una condición de entrada');};
+    el.querySelector('.iop').onchange=e=>{r.open=e.target.value;invalidate('has cambiado una condición de apertura');};
+    el.querySelector('.ior').onchange=e=>{r.orient=e.target.value;invalidate('has cambiado una orientación');};
+    el.querySelector('.cat').onchange=e=>{r.cat=e.target.value;
+      r.elast=ELAST[r.cat];r.entry=ENTRY_DEF[r.cat];r.open=OPEN_DEF[r.cat];
+      invalidate('has cambiado la clase de un local');renderRooms();};
+    el.querySelector('.x').onclick=()=>{
+      // quitar un local reindexa y reconstruye las relaciones: es otro problema
+      resetComputedState();S.rooms.splice(i,1);
+      const nr={};Object.keys(S.rel||{}).forEach(k=>{
+        const [a,b]=k.split('-').map(Number);
+        if(a===i||b===i)return;
+        nr[relKey(a>i?a-1:a,b>i?b-1:b)]=S.rel[k];});
+      S.rel=nr;renderRooms();renderResults();draw();};
+    // relaciones existentes
+    const holder=el.querySelector('.rels');
+    S.rooms.forEach((o,j)=>{
+      if(j===i)return;
+      const v=relOf(i,j);if(v==='indiferente')return;
+      const t=document.createElement('button');t.className='rel '+v;
+      t.textContent={contiguo:'▬',proximo:'≈',evitar:'✕'}[v]+' '+o.name;
+      t.title='clic para cambiar, doble clic para quitar';
+      t.onclick=()=>{const nx={contiguo:'proximo',proximo:'evitar',evitar:'contiguo'}[v];
+        setRel(i,j,nx);invalidate('has cambiado una relación');renderRooms();};
+      t.ondblclick=()=>{setRel(i,j,'indiferente');invalidate('has quitado una relación');renderRooms();};
+      holder.appendChild(t);});
+    el.querySelector('.addrel').onclick=()=>{
+      const libres=S.rooms.map((o,j)=>j).filter(j=>j!==i&&relOf(i,j)==='indiferente');
+      if(!libres.length)return;
+      const sel=document.createElement('select');sel.className='newrel';
+      sel.innerHTML='<option value="">añadir…</option>'+
+        libres.map(j=>`<option value="${j}">${S.rooms[j].name}</option>`).join('');
+      sel.onchange=e=>{if(e.target.value!==''){setRel(i,+e.target.value,'contiguo');invalidate('has añadido una relación');renderRooms();}};
+      el.querySelector('.l5').appendChild(sel);sel.focus();};
+    box.appendChild(el);
+  });
+  refreshTotals();
+}
+$('#bAdd').onclick=()=>{resetComputedState();
+  addRoom('Local '+(S.rooms.length+1),'publico',3,4,0);renderRooms();renderResults();draw();};
+$('#bPre1').onclick=()=>{resetComputedState();preVivienda();renderRooms();renderResults();draw();};
+$('#bPre2').onclick=()=>{resetComputedState();preOficina();renderRooms();renderResults();draw();};
+$('#bClear').onclick=()=>{resetComputedState();S.rooms.length=0;S.rel={};renderRooms();renderResults();draw();};
+function refreshTotals(){
+  const el=$('#totals');
+  if(!S.rooms.length){el.innerHTML='';$('#bRun').disabled=true;return;}
+  const A=S.closed?area():0;
+  const sMin=S.rooms.reduce((s,r)=>s+minArea(r),0);
+  const libre=S.rooms.some(r=>!r.maxArea);
+  const gf=growth(S.rooms,A);
+  const sMax=S.rooms.reduce((s,r)=>s+searchCap(r,gf),0);
+  const conTope=S.rooms.filter(r=>r.maxArea);
+  const sDecl=conTope.reduce((s,r)=>s+Math.max(r.maxArea,minArea(r)),0);
+  const pr=programTargets(S.rooms,A,gf);
+  const opt=(S.sel>=0&&S.options[S.sel])?S.options[S.sel]:null;
+  document.querySelectorAll('.asg').forEach(sp=>{
+    const i=+sp.dataset.i,r=S.rooms[i];if(!r)return;
+    if(opt&&opt.rooms[i]){
+      sp.innerHTML='asignado <b>'+nf(opt.rooms[i].area,1)+'</b> m²';
+      sp.classList.toggle('cap',!opt.rooms[i].inRange);
+    }else{
+      sp.innerHTML='previsto <b>'+nf(pr.t[i]||0,1)+'</b> m²';
+      sp.classList.toggle('cap',false);}});
+  const per={publico:0,privado:0,servicio:0};S.rooms.forEach(r=>per[r.cat]+=minArea(r));
+  let estado;
+  if(!S.closed) estado='<span class="bad">falta cerrar el perímetro</span>';
+  else if(sMin>A) estado=`<span class="bad">el mínimo supera la planta en ${nf(sMin-A,2)} m²</span>`;
+  else if(sMax<A-0.5) estado=`el programa no llega a llenar la planta: unos <b>${nf(A-sMax,2)}</b> m² quedarán como superficie libre`;
+  else estado=`excedente por repartir ${nf(A-sMin,2)} m² · el reparto definitivo depende de la geometría`;
+  el.innerHTML=
+    `<b>${S.rooms.length}</b> locales · planta <b>${nf(A,2)}</b> m²<br>`+
+    `superficie mínima total <b>${nf(sMin,2)}</b> m²`+
+    (conTope.length?` · con tope declarado ${conTope.length} local(es), ${nf(sDecl,2)} m²`:' · ningún tope declarado')+
+    `<br><span style="color:var(--ink30)">sobre de búsqueda interno ${nf(sMax,2)} m² — no es una condición del programa</span><br>`+
+    CATORDER.filter(c=>per[c]>0).map(c=>`${CATS[c].label} ${nf(per[c],1)}`).join(' · ')+'<br>'+estado;
+  $('#bRun').disabled=!S.closed||sMin>A;
+}
+
+/* ═════════ reparto de superficies ═════════ */
+function programTargets(rooms,A,f){
+  const n=rooms.length,mins=rooms.map(minArea);
+  const gf=f||growth(rooms,A);
+  const maxs=rooms.map(r=>searchCap(r,gf));
+  // Peso de reparto: AQUÍ, y sólo aquí, manda la elasticidad. Decide hacia
+  // dónde se empuja el excedente, no qué es admisible.
+  const wt=rooms.map(r=>minArea(r)*Math.max(0.01,
+    (r.elast!==undefined?r.elast:ELAST[r.cat]||50)/100));
+  const t=[...mins];
+  let rest=A-mins.reduce((a,b)=>a+b,0),over=false;
+  if(rest<=0)return{t,over:false};
+  for(let it=0;it<80&&rest>1e-9;it++){
+    const act=[];for(let i=0;i<n;i++)if(t[i]<maxs[i]-1e-9)act.push(i);
+    if(!act.length){over=true;break;}
+    const w=act.reduce((s,i)=>s+wt[i],0)||act.length;
+    let used=0;
+    for(const i of act){const add=Math.min(rest*wt[i]/w,maxs[i]-t[i]);t[i]+=add;used+=add;}
+    rest-=used;if(used<1e-12){over=true;break;}}
+  if(rest>1e-6){over=true;const w=wt.reduce((a,b)=>a+b,0)||n;
+    for(let i=0;i<n;i++)t[i]+=rest*wt[i]/w;}
+  return{t,over};
+}
+
+/* ═════════ descomposición del perímetro en rectángulos ═════════ */
+function slabs(pts,vertical){
+  const key=p=>vertical?p.x:p.y;
+  const cuts=[...new Set(pts.map(p=>Math.round(key(p)*1e4)/1e4))].sort((a,b)=>a-b);
+  const out=[];
+  const cross=(m)=>{
+    const ys=[],n=pts.length;
+    for(let k=0;k<n;k++){
+      const a=pts[k],b=pts[(k+1)%n];
+      const a1=key(a),b1=key(b),a2=vertical?a.y:a.x,b2=vertical?b.y:b.x;
+      if((a1<=m&&b1>m)||(b1<=m&&a1>m)){const t=(m-a1)/(b1-a1);ys.push(a2+t*(b2-a2));}}
+    ys.sort((a,b)=>a-b);return ys;};
+  for(let i=0;i<cuts.length-1;i++){
+    const w=cuts[i+1]-cuts[i];if(w<0.05)continue;
+    const A=cross(cuts[i]+w*0.02),B=cross(cuts[i+1]-w*0.02);
+    if(A.length!==B.length)continue;
+    for(let k=0;k+1<A.length;k+=2){
+      const lo=Math.max(A[k],B[k]),hi=Math.min(A[k+1],B[k+1]);
+      if(hi-lo<0.05)continue;
+      out.push(vertical?{x:cuts[i],y:lo,w,h:hi-lo}:{x:lo,y:cuts[i],w:hi-lo,h:w});}}
+  // fusionar bandas contiguas con el mismo intervalo
+  let merged=true;
+  while(merged){
+    merged=false;
+    for(let i=0;i<out.length&&!merged;i++)for(let j=i+1;j<out.length;j++){
+      const A=out[i],B=out[j];
+      if(vertical){
+        if(Math.abs(A.y-B.y)<EPS&&Math.abs(A.h-B.h)<EPS&&
+           (Math.abs(A.x+A.w-B.x)<EPS||Math.abs(B.x+B.w-A.x)<EPS)){
+          const x=Math.min(A.x,B.x);A.w=A.w+B.w;A.x=x;out.splice(j,1);merged=true;break;}
+      }else{
+        if(Math.abs(A.x-B.x)<EPS&&Math.abs(A.w-B.w)<EPS&&
+           (Math.abs(A.y+A.h-B.y)<EPS||Math.abs(B.y+B.h-A.y)<EPS)){
+          const y=Math.min(A.y,B.y);A.h=A.h+B.h;A.y=y;out.splice(j,1);merged=true;break;}
+      }}
+  }
+  return out;
+}
+
+/* ═════════ subdivisión en rectángulos ═════════ */
+const fits=(R,it)=>(R.w>=it.a-1e-4&&R.h>=it.b-1e-4)||(R.w>=it.b-1e-4&&R.h>=it.a-1e-4);
+function feasible(R,items){
+  const need=Math.max(...items.map(t=>Math.min(t.a,t.b)));
+  if(Math.min(R.w,R.h)<need-1e-4)return false;
+  if(items.length===1)return fits(R,items[0]);
+  return true;
+}
+function rescale(g,A){
+  const mins=g.map(t=>t.a*t.b),maxs=g.map(t=>t.mx);
+  const t=[...mins];
+  let rest=A-mins.reduce((a,b)=>a+b,0);
+  for(let it=0;it<40&&rest>1e-9;it++){
+    const act=[];for(let i=0;i<g.length;i++)if(t[i]<maxs[i]-1e-9)act.push(i);
+    if(!act.length)break;
+    const w=act.reduce((s,i)=>s+mins[i],0)||act.length;
+    let used=0;
+    for(const i of act){const add=Math.min(rest*mins[i]/w,maxs[i]-t[i]);t[i]+=add;used+=add;}
+    rest-=used;if(used<1e-12)break;}
+  if(rest>1e-6){const w=mins.reduce((a,b)=>a+b,0)||g.length;g.forEach((x,i)=>t[i]+=rest*mins[i]/w);}
+  return g.map((x,i)=>({...x,area:t[i]}));
+}
+function minSpan(g,cross){
+  let need=0;
+  for(const t of g){
+    if(Math.min(t.a,t.b)>cross+1e-4)return null;
+    need=Math.max(need,Math.min(t.a,t.b));}
+  if(g.length===1){
+    const t=g[0];let w=Infinity;
+    if(cross>=t.b-1e-4)w=Math.min(w,t.a);
+    if(cross>=t.a-1e-4)w=Math.min(w,t.b);
+    return isFinite(w)?w:null;}
+  return need;
+}
+function layout(R,items,rng,prop,noise){
+  if(!items.length)return[];
+  if(items.length===1){
+    const t=items[0];
+    if(R.w*R.h>t.mx+0.2)return null;      // excedería su tope de superficie
+    if(!fits(R,t))return null;            // no caben sus lados a×b
+    return[{i:t.i,rect:R}];}
+  const total=R.w*R.h;
+  const cands=[];
+  for(let k=1;k<items.length;k++){
+    const g1=items.slice(0,k),g2=items.slice(k);
+    // no partir dentro de un bloque: la indivisibilidad la decide el blockId,
+    // no la relación explícita entre los dos vecinos del corte (una cadena
+    // A-B-C reordenada como A-C-B rompería la garantía si mirásemos relOf).
+    // La atomicidad del bloque es una PREFERENCIA FUERTE, no una prohibición.
+    // Antes era «continue»: un bloque no podía subdividirse por guillotina
+    // jamás, y si la región contenía un solo bloque grande la única salida eran
+    // franjas paralelas de fachada a fachada, que en planta ajustada no caben.
+    // Quien decide si «contiguo» y «abre a» se cumplen son las reglas duras del
+    // final, no esta línea. Con la penalización, cortar dentro de un bloque es
+    // siempre la última opción, pero deja de ser imposible.
+    const rompeBloque=items[k-1].blk!==undefined&&items[k-1].blk===items[k].blk;
+    const lo1=g1.reduce((s,t)=>s+t.a*t.b,0),hi1=g1.reduce((s,t)=>s+t.mx,0);
+    const lo2=g2.reduce((s,t)=>s+t.a*t.b,0),hi2=g2.reduce((s,t)=>s+t.mx,0);
+    const A1min=Math.max(lo1,total-hi2),A1max=Math.min(hi1,total-lo2);
+    if(A1min>A1max+1e-6)continue;
+    const A1t=g1.reduce((s,t)=>s+t.area,0);
+    for(const dir of [0,1]){
+      const span=dir===0?R.w:R.h,cross=dir===0?R.h:R.w;
+      const n1=minSpan(g1,cross),n2=minSpan(g2,cross);
+      if(n1===null||n2===null)continue;
+      let fmin=Math.max(A1min/total,n1/span),fmax=Math.min(A1max/total,1-n2/span);
+      if(fmin>fmax+1e-9)continue;
+      const f=Math.min(Math.max(A1t/total,fmin),fmax);
+      const s1=span*f;
+      if(s1<0.5||span-s1<0.5)continue;
+      const r1=dir===0?{x:R.x,y:R.y,w:s1,h:R.h}:{x:R.x,y:R.y+R.h-s1,w:R.w,h:s1};
+      const r2=dir===0?{x:R.x+s1,y:R.y,w:R.w-s1,h:R.h}:{x:R.x,y:R.y,w:R.w,h:R.h-s1};
+      const ar=r=>Math.max(r.w,r.h)/Math.max(0.01,Math.min(r.w,r.h));
+      const desv=Math.abs(s1/span-A1t/total);
+      let cost=prop*(ar(r1)+ar(r2))+desv*6+rng()*(0.2+noise*2.5)+(rompeBloque?60:0);
+      if(g1.length===1)cost+=leafCost(r1,g1[0],prop);
+      if(g2.length===1)cost+=leafCost(r2,g2[0],prop);
+      cands.push({r1,r2,g1:rescale(g1,r1.w*r1.h),g2:rescale(g2,r2.w*r2.h),cost});}}
+  if(!cands.length){
+    // Antes de las franjas paralelas: si este grupo tiene un nexo, el esquema
+    // de crujías. Faltaba esta salida. layoutCorridor() sólo se probaba en la
+    // región entera, nunca dentro de un bloque indivisible, así que un bloque
+    // «nexo + privados» sólo podía resolverse como franjas de fachada a
+    // fachada —y en planta ajustada eso no cabe nunca—. Con el preset de
+    // oficina en 14×10 eso daba 0 candidatas de 480.
+    if(items.some(t=>t.cat==='nexo')){
+      const cr=layoutCorridor(R,items,rng);
+      if(cr)return cr;}
+    // Franjas de emergencia. Se prueban las dos orientaciones y se devuelve
+    // sólo si TODAS las franjas contienen su a×b y respetan su tope: antes
+    // devolvía geometría que ya sabía inválida, inflando el recuento de
+    // «construidas» con candidatas condenadas de antemano.
+    const g=rescale(items,total);
+    for(const horiz of (R.w>=R.h?[true,false]:[false,true])){
+      const out=[];let off=0,ok=true;
+      for(const t of g){
+        const d=(horiz?t.area/R.h:t.area/R.w);
+        const rect=horiz?{x:R.x+off,y:R.y,w:d,h:R.h}:{x:R.x,y:R.y+off,w:R.w,h:d};
+        if(!fits(rect,t)||rect.w*rect.h>t.mx+0.15){ok=false;break;}
+        out.push({i:t.i,rect});off+=d;}
+      if(ok)return out;}
+    return null;}
+  cands.sort((a,b)=>a.cost-b.cost);
+  for(let a=0;a<Math.min(cands.length,4);a++){
+    const pick=cands[a===0?Math.floor(rng()*Math.min(cands.length,1+Math.floor(rng()*3))):a];
+    const L1=layout(pick.r1,pick.g1,rng,prop,noise);if(!L1)continue;
+    const L2=layout(pick.r2,pick.g2,rng,prop,noise);if(!L2)continue;
+    return L1.concat(L2);}
+  return null;
+}
+function layoutCorridor(R,items,rng){
+  let bi=-1;
+  items.forEach((t,k)=>{if(t.cat==='nexo'&&(bi<0||t.area>items[bi].area))bi=k;});
+  if(bi<0||items.length<2)return null;
+  for(const horiz of (R.w>=R.h?[true,false]:[false,true])){
+    const along=horiz?R.w:R.h,deep=horiz?R.h:R.w;
+    const band={...items[bi]},rest=items.filter((t,k)=>k!==bi).map(t=>({...t}));
+    if(!rest.length)return null;
+    if(along<Math.max(band.a,band.b)-1e-4)continue;
+    const bt=Math.max(band.area/along,Math.min(band.a,band.b));
+    if(bt*along>band.area*2.4+2)continue;      // la banda no debe engordar sin motivo
+    if(bt*along>(band.mx||1e9)+0.15)continue;      // el nexo se pasaría de su tope
+    const extra=bt*along-band.area;
+    if(extra>1e-9){
+      const slack=rest.reduce((s,t)=>s+Math.max(0,t.area-t.a*t.b),0);
+      if(slack<extra-1e-9)continue;
+      rest.forEach(t=>{const sl=Math.max(0,t.area-t.a*t.b);t.area-=extra*sl/slack;});
+      band.area=bt*along;
+    }
+    const bandT=band.area/along;
+    if(deep-bandT<0.6)continue;
+    const splits=[];
+    for(let k=1;k<rest.length;k++)splits.push(k);
+    splits.push(0);splits.push(rest.length);
+    const cands=[];
+    for(const k of splits){
+      const A=rest.slice(0,k),B=rest.slice(k);
+      const dA=A.reduce((s,t)=>s+t.area,0)/along,dB=B.reduce((s,t)=>s+t.area,0)/along;
+      if((A.length&&dA<0.6)||(B.length&&dB<0.6))continue;
+      let bad=0,pen=0;const out=[];
+      const place=(list,depth,off)=>{
+        if(!list.length)return;
+        const wmin=list.map(t=>{let w=Infinity;
+          if(depth>=t.b-1e-4)w=Math.min(w,t.a);
+          if(depth>=t.a-1e-4)w=Math.min(w,t.b);
+          return w;});
+        if(wmin.some(w=>!isFinite(w))){bad++;return;}
+        const wmax=list.map(t=>t.mx/depth);
+        // Si a esta profundidad de crujía el ancho geométrico mínimo de un local
+        // ya supera su tope de superficie, la crujía no sirve: se rechaza la
+        // profundidad en vez de reventar el máximo.
+        if(wmin.some((v,i)=>v>wmax[i]+1e-6)){bad++;return;}
+        const w=list.map((t,i)=>Math.max(wmin[i],Math.min(t.area/depth,wmax[i])));
+        let diff=along-w.reduce((a,b)=>a+b,0);
+        for(let it=0;it<30&&Math.abs(diff)>1e-6;it++){
+          const act=[];
+          for(let i=0;i<w.length;i++){
+            if(diff>0&&w[i]<wmax[i]-1e-9)act.push(i);
+            else if(diff<0&&w[i]>wmin[i]+1e-9)act.push(i);}
+          if(!act.length)break;
+          const share=diff/act.length;
+          act.forEach(i=>{w[i]=Math.max(wmin[i],Math.min(wmax[i],w[i]+share));});
+          diff=along-w.reduce((a,b)=>a+b,0);}
+        if(Math.abs(diff)>0.03){bad++;return;}
+        let pos=0;
+        list.forEach((t,i)=>{
+          const r=horiz?{x:R.x+pos,y:R.y+off,w:w[i],h:depth}
+                       :{x:R.x+off,y:R.y+pos,w:depth,h:w[i]};
+          if(!fits(r,t))bad++;
+          pen+=Math.abs(Math.max(r.w,r.h)/Math.max(0.01,Math.min(r.w,r.h))-Math.max(t.a,t.b)/Math.min(t.a,t.b));
+          out.push({i:t.i,rect:r});pos+=w[i];});};
+      place(A,dA,0);
+      const bandRect=horiz?{x:R.x,y:R.y+dA,w:R.w,h:bandT}:{x:R.x+dA,y:R.y,w:bandT,h:R.h};
+      if(!fits(bandRect,band))bad++;
+      out.push({i:band.i,rect:bandRect});
+      place(B,dB,dA+bandT);
+      if(bad===0)cands.push({out,cost:pen+rng()*0.4});
+    }
+    if(!cands.length)continue;
+    cands.sort((a,b)=>a.cost-b.cost);
+    return (cands[Math.floor(rng()*Math.min(cands.length,2))]||cands[0]).out;
+  }
+  return null;
+}
+function leafCost(R,it,prop){
+  if(!fits(R,it))return 400;
+  const want=Math.max(it.a,it.b)/Math.min(it.a,it.b);
+  const got=Math.max(R.w,R.h)/Math.max(0.01,Math.min(R.w,R.h));
+  return prop*Math.abs(got-want)*0.6;
+}
+
+/* ═════════ bordes, adyacencias y puertas ═════════ */
+function subtract(ivs,lo,hi){
+  const out=[];
+  ivs.forEach(([a,b])=>{
+    if(hi<=a+EPS||lo>=b-EPS){out.push([a,b]);return;}
+    if(lo>a+EPS)out.push([a,Math.min(lo,b)]);
+    if(hi<b-EPS)out.push([Math.max(hi,a),b]);});
+  return out;
+}
+function roomEdges(rects){
+  const out=[];
+  rects.forEach(R=>{
+    const sides=[
+      {o:0,fix:R.x,a:R.y,b:R.y+R.h,far:true},
+      {o:0,fix:R.x+R.w,a:R.y,b:R.y+R.h,far:false},
+      {o:1,fix:R.y,a:R.x,b:R.x+R.w,far:true},
+      {o:1,fix:R.y+R.h,a:R.x,b:R.x+R.w,far:false}];
+    sides.forEach(sd=>{
+      let ivs=[[sd.a,sd.b]];
+      rects.forEach(Q=>{
+        if(Q===R)return;
+        if(sd.o===0){
+          const qx=sd.far?Q.x+Q.w:Q.x;
+          if(Math.abs(qx-sd.fix)<EPS)ivs=subtract(ivs,Math.max(sd.a,Q.y),Math.min(sd.b,Q.y+Q.h));
+        }else{
+          const qy=sd.far?Q.y+Q.h:Q.y;
+          if(Math.abs(qy-sd.fix)<EPS)ivs=subtract(ivs,Math.max(sd.a,Q.x),Math.min(sd.b,Q.x+Q.w));}});
+      ivs.forEach(([p,q])=>{if(q-p>EPS)out.push(sd.o===0?{x1:sd.fix,y1:p,x2:sd.fix,y2:q}:{x1:p,y1:sd.fix,x2:q,y2:sd.fix});});});
+  });
+  return out;
+}
+function onPerim(p){
+  const n=S.pts.length;let bd=1e9;
+  for(let i=0;i<n;i++){const a=S.pts[i],b=S.pts[(i+1)%n];
+    const dx=b.x-a.x,dy=b.y-a.y,L2=dx*dx+dy*dy||1;
+    let t=((p.x-a.x)*dx+(p.y-a.y)*dy)/L2;t=Math.max(0,Math.min(1,t));
+    bd=Math.min(bd,Math.hypot(a.x+dx*t-p.x,a.y+dy*t-p.y));}
+  return bd;}
+function rectAdj(A,B){
+  if(Math.abs(A.x+A.w-B.x)<1e-4||Math.abs(B.x+B.w-A.x)<1e-4){
+    const x=Math.abs(A.x+A.w-B.x)<1e-4?A.x+A.w:B.x+B.w;
+    const lo=Math.max(A.y,B.y),hi=Math.min(A.y+A.h,B.y+B.h);
+    if(hi-lo>1e-4)return{len:hi-lo,seg:{x1:x,y1:lo,x2:x,y2:hi}};}
+  if(Math.abs(A.y+A.h-B.y)<1e-4||Math.abs(B.y+B.h-A.y)<1e-4){
+    const y=Math.abs(A.y+A.h-B.y)<1e-4?A.y+A.h:B.y+B.h;
+    const lo=Math.max(A.x,B.x),hi=Math.min(A.x+A.w,B.x+B.w);
+    if(hi-lo>1e-4)return{len:hi-lo,seg:{x1:lo,y1:y,x2:hi,y2:y}};}
+  return null;
+}
+// ¿Puede existir una puerta entre i y j? Condición SIMÉTRICA: mira los dos
+// extremos, porque «abre a: sólo nexo» es una propiedad del local, no del
+// sentido en que se le llegue. La usan por igual el árbol, las conexiones
+// secundarias y la validación final: si el generador se equivoca, la planta
+// no pasa. La entrada exterior queda fuera — no es una puerta entre locales.
+function doorAllowed(rooms,i,j,relaxSet,hasNexo){
+  if(rooms[i].cat==='resto'||rooms[j].cat==='resto')return false;
+  if(rooms[i].cat==='privado'&&rooms[j].cat==='privado')return false;
+  const rel=relaxSet&&relaxSet.apertura;
+  const modo=r=>r.open||OPEN_DEF[r.cat]||'libre';
+  for(const [a,b] of [[i,j],[j,i]]){
+    if(modo(rooms[a])!=='nexo')continue;
+    // ANTES: «if(!hasNexo)continue» — si el programa no declaraba ningún nexo,
+    // la regla se evaporaba en silencio y el motor daba por válidas plantas con
+    // un despacho abriendo al estar. Medido: 162 de 162 «válidas» la infringían.
+    // Ahora la regla es real: sin nexo no se cumple, y sólo el último escalón
+    // de la escalera cede, dejándolo marcado como cesión.
+    if(rel){ if(rooms[b].cat==='privado')return false; }
+    else if(rooms[b].cat!=='nexo')return false;
+  }
+  return true;}
+function doorPlan(rooms,shapes,doorW,start,relaxSet){
+  const R=shapes.length,adj={};
+  for(let i=0;i<R;i++)for(let j=i+1;j<R;j++){
+    let best=null;
+    shapes[i].forEach(A=>shapes[j].forEach(B=>{
+      const c=rectAdj(A,B);if(c&&(!best||c.len>best.len))best=c;}));
+    if(best)adj[i+'-'+j]=best;}
+  const hasNexo=rooms.some(r=>r.cat==='nexo');
+  const mode=r=>r.open||OPEN_DEF[r.cat]||'libre';
+  const link=(u,q)=>{
+    const c=adj[u<q?u+'-'+q:q+'-'+u];
+    if(!c||c.len<doorW-1e-4)return null;
+    // La superficie libre es área NO programada: no es circulación y no puede
+    // encadenar accesos; y el privado nunca es espacio de paso.
+    if(!doorAllowed(rooms,u,q,relaxSet,hasNexo))return null;
+    if(rooms[u].cat==='privado'&&u!==start)return null;
+    const base={nexo:1,publico:2.5,servicio:7,privado:99}[rooms[u].cat]||3;
+    const pen=(rooms[q].cat==='privado')
+      ? (rooms[u].cat==='nexo'?0:(rooms[u].cat==='publico'?18:40)) : 0;
+    return{c,w:base+pen};};
+  const dist=new Float64Array(R).fill(Infinity),par=new Int32Array(R).fill(-1),done=new Uint8Array(R);
+  dist[start]=0;
+  for(let it=0;it<R;it++){
+    let u=-1,bd=Infinity;
+    for(let i=0;i<R;i++)if(!done[i]&&dist[i]<bd){bd=dist[i];u=i;}
+    if(u<0)break;done[u]=1;
+    for(let q=0;q<R;q++){
+      if(q===u||done[q])continue;
+      const e=link(u,q);if(!e)continue;
+      const nd=dist[u]+e.w+1/(1+e.c.len);
+      if(nd<dist[q]){dist[q]=nd;par[q]=u;}}}
+  const mk=(a,b,c)=>{
+    const sg=c.seg,L=Math.hypot(sg.x2-sg.x1,sg.y2-sg.y1),w=Math.min(doorW,L*0.9);
+    const mx=(sg.x1+sg.x2)/2,my=(sg.y1+sg.y2)/2,ux=(sg.x2-sg.x1)/L,uy=(sg.y2-sg.y1)/L;
+    return{a,b,seg:{x1:mx-ux*w/2,y1:my-uy*w/2,x2:mx+ux*w/2,y2:my+uy*w/2}};};
+  const doors=[],deg=new Int32Array(R);
+  for(let i=0;i<R;i++){
+    if(i===start||par[i]<0)continue;
+    const e=link(par[i],i);if(!e)continue;
+    doors.push(mk(par[i],i,e.c));deg[i]++;deg[par[i]]++;}
+  deg[start]++;
+  // Conexiones secundarias: sólo entre locales declarados contiguos que no se
+  // tocan ya por el árbol, y nunca en privados (que conservan una sola puerta).
+  for(let i=0;i<S.rooms.length;i++)for(let j=i+1;j<S.rooms.length;j++){
+    if(relOf(i,j)!=='contiguo')continue;
+    if(par[i]===j||par[j]===i)continue;
+    if(rooms[i].cat==='privado'||rooms[j].cat==='privado')continue;
+    if(!doorAllowed(rooms,i,j,relaxSet,hasNexo))continue;   // mismo criterio que el árbol
+    const c=adj[i+'-'+j];
+    if(!c||c.len<doorW-1e-4)continue;
+    doors.push(mk(i,j,c));deg[i]++;deg[j]++;}
+  // Profundidad topológica medida por BFS sobre el grafo FINAL de puertas, no
+  // sobre el árbol de padres: una conexión secundaria puede acortar también el
+  // recorrido de todos los descendientes, y eso no se propagaba con un ajuste
+  // local de las dos profundidades implicadas.
+  const gAdj=Array.from({length:R},()=>[]);
+  doors.forEach(d=>{gAdj[d.a].push(d.b);gAdj[d.b].push(d.a);});
+  const depth=new Float64Array(R).fill(Infinity);
+  depth[start]=1;
+  const q=[start];
+  for(let h=0;h<q.length;h++)
+    for(const m of gAdj[q[h]])if(!isFinite(depth[m])){depth[m]=depth[q[h]]+1;q.push(m);}
+  // Accesibilidad, profundidad y relaciones miden sobre EL MISMO grafo: el final,
+  // con las puertas secundarias incluidas. Antes reach venía del Dijkstra previo,
+  // así que una puerta secundaria podía dejar un local alcanzable y marcado
+  // como inaccesible.
+  return{doors,deg,par,depth,gAdj,
+    reach:Array.from({length:R},(_,i)=>isFinite(depth[i]))};
+}
+function doorParts(d){
+  const {x1,y1,x2,y2}=d.seg,L=Math.hypot(x2-x1,y2-y1);
+  if(L<1e-6)return null;
+  const ux=(x2-x1)/L,uy=(y2-y1)/L;
+  let nx=-uy,ny=ux;
+  const opt=S.options[S.sel];
+  if(opt){
+    const mx=(x1+x2)/2,my=(y1+y2)/2;
+    const inB=opt.rooms[d.b].rects.some(R=>
+      mx+nx*0.15>=R.x-EPS&&mx+nx*0.15<=R.x+R.w+EPS&&my+ny*0.15>=R.y-EPS&&my+ny*0.15<=R.y+R.h+EPS);
+    if(!inB){nx=-nx;ny=-ny;}}
+  const a0=Math.atan2(ny,nx),a1=Math.atan2(uy,ux);
+  let da=a1-a0;while(da>Math.PI)da-=2*Math.PI;while(da<-Math.PI)da+=2*Math.PI;
+  const arc=[];for(let t=0;t<=10;t++){const a=a0+da*t/10;arc.push({x:x1+Math.cos(a)*L,y:y1+Math.sin(a)*L});}
+  return{p1:{x:x1,y:y1},p2:{x:x2,y:y2},end:{x:x1+nx*L,y:y1+ny*L},arc,L};
+}
+
+/* ═════════ generación de una opción ═════════ */
+function shuffle(arr,rng){for(let i=arr.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}return arr;}
+function buildOption(rng,prop,doorW,noise,relax,relaxSet){
+  let rooms=S.rooms;
+  relaxSet=relaxSet||{topes:relax||1,apertura:false};
+  const vertical=rng()<0.5;
+  let regs=slabs(S.pts,vertical);
+  if(!regs.length)regs=slabs(S.pts,!vertical);
+  if(!regs.length)return null;
+  const smallest=Math.min(...rooms.map(minArea));
+  const annex=[];
+  regs.sort((a,b)=>b.w*b.h-a.w*a.h);
+  // Unidades indivisibles, NO locales sueltos. Un bloque «contiguo» viaja
+  // entero: cuatro locales de los que dos van unidos son TRES unidades. Si se
+  // recorta a cuatro regiones, una se queda vacía y la planta se descarta
+  // siempre. Antes se contaban locales y toda una familia de plantas —programa
+  // corto con relaciones «contiguo» y perímetro de muchos lados— no construía
+  // ni una sola candidata.
+  const nUnidades=(()=>{
+    const bo=S.rooms.map((r,i)=>i);
+    const f=x=>{while(bo[x]!==x)x=bo[x]=bo[bo[x]];return x;};
+    for(let i=0;i<S.rooms.length;i++)for(let j=i+1;j<S.rooms.length;j++)
+      if(relOf(i,j)==='contiguo'){const a=f(i),b=f(j);if(a!==b)bo[a]=b;}
+    const nx=S.rooms.map((r,i)=>i).filter(i=>S.rooms[i].cat==='nexo');
+    if(nx.length&&!relaxSet.apertura){
+      const pv=S.rooms.map((r,i)=>i).filter(i=>S.rooms[i].cat==='privado'&&
+        (S.rooms[i].open||OPEN_DEF.privado)==='nexo');
+      if(pv.length){const per=Math.ceil(pv.length/nx.length);
+        pv.forEach((pi,k)=>{const n2=nx[Math.min(nx.length-1,Math.floor(k/per))];
+          const a=f(pi),b=f(n2);if(a!==b)bo[a]=b;});}}
+    const set=new Set();S.rooms.forEach((r,i)=>set.add(f(i)));
+    return Math.max(1,set.size);})();
+  // Condición DUAL, que faltaba. prechecks() comprobaba «¿cabe cada local en
+  // alguna franja?» y nunca «¿hay alguna franja en la que no quepa ningún
+  // local?». Como toda franja es obligatoria, una sola franja inservible
+  // descartaba TODAS las candidatas. Una muesca de 2×4 en el perímetro genera
+  // franjas de 2,0 m y de 0,5 m de fondo: 0 candidatas en 20.000 ensayos.
+  const cabeAlguno=R=>rooms.some(r=>
+    (R.w>=r.a-1e-4&&R.h>=r.b-1e-4)||(R.w>=r.b-1e-4&&R.h>=r.a-1e-4));
+  for(let k=regs.length-1;k>=0&&regs.length>1;k--)
+    if(!cabeAlguno(regs[k]))annex.push(regs.splice(k,1)[0]);
+  if(!regs.length)return null;
+  while(regs.length>1&&(regs.length>nUnidades||regs[regs.length-1].w*regs[regs.length-1].h<smallest*0.95))
+    annex.push(regs.pop());
+  const usable=regs.reduce((s,r)=>s+r.w*r.h,0)+annex.reduce((s,r)=>s+r.w*r.h,0);
+  const main=regs.reduce((s,r)=>s+r.w*r.h,0);
+  let GF=growth(rooms,main,relax);
+  const topes=rooms.reduce((s,r)=>s+effMax(r,GF),0);
+  if(topes<main-0.5){          // los topes no llenan la planta: el resto queda libre
+    rooms=rooms.concat([{name:'Superficie libre',cat:'resto',a:1.5,b:1.5,
+      maxArea:(main-topes)*1.4+3}]);
+    GF=growth(rooms,main,relax);}
+  let free=rooms.length>S.rooms.length;
+  const pr=programTargets(rooms,main,GF);
+  const target=pr.t;
+  // regiones ordenadas por proximidad al acceso
+  const dr=R=>Math.hypot(R.x+R.w/2-S.door.x,R.y+R.h/2-S.door.y);
+  regs.sort((a,b)=>dr(a)-dr(b));
+  // orden de locales: clases agrupadas, público primero
+  const seqs=[['publico','servicio','nexo','privado'],
+              ['publico','nexo','servicio','privado'],
+              ['servicio','publico','nexo','privado'],
+              ['publico','nexo','privado','servicio']];
+  const catSeq=seqs[Math.floor(rng()*seqs.length)].filter(c=>rooms.some(r=>r.cat===c));
+  if(free)catSeq.push('resto');
+  // bloques: los locales unidos por «contiguo» viajan juntos por todo el proceso
+  const blockOf=rooms.map((r,i)=>i);
+  const find=x=>{while(blockOf[x]!==x)x=blockOf[x]=blockOf[blockOf[x]];return x;};
+  for(let i=0;i<S.rooms.length;i++)for(let j=i+1;j<S.rooms.length;j++)
+    if(relOf(i,j)==='contiguo'){const a=find(i),b=find(j);if(a!==b)blockOf[a]=b;}
+  // los privados que sólo pueden abrir a nexo viajan con un nexo: si acaban en
+  // otra región, ninguna puerta podrá cumplir la regla
+  const nexos=rooms.map((r,i)=>i).filter(i=>rooms[i].cat==='nexo');
+  if(nexos.length&&!relaxSet.apertura){
+    const privs=rooms.map((r,i)=>i).filter(i=>rooms[i].cat==='privado'&&
+      (rooms[i].open||OPEN_DEF.privado)==='nexo');
+    if(privs.length){
+      // reparte los privados entre los nexos disponibles, en bloques equilibrados
+      const per=Math.ceil(privs.length/nexos.length);
+      privs.forEach((pi,k)=>{const nx=nexos[Math.min(nexos.length-1,Math.floor(k/per))];
+        const a=find(pi),b=find(nx);if(a!==b)blockOf[a]=b;});}}
+  // Dos nociones de bloque, que antes estaban confundidas en una:
+  //  · blockOf/find — para la ASIGNACIÓN A REGIONES: el nexo y sus privados
+  //    tienen que caer en la misma franja o ninguna puerta podrá cumplir la
+  //    regla. Aquí sí viajan juntos.
+  //  · contOf/findC — para la GUILLOTINA: sólo «contiguo» obliga a no cortar
+  //    entre dos locales. Meter ahí al grupo nexo+privados lo convertía en un
+  //    átomo de 4 locales que layout() no podía subdividir nunca, y la única
+  //    salida eran franjas paralelas de fachada a fachada. Con el preset de
+  //    oficina en un rectángulo de 14×10 eso daba 0 candidatas de 480.
+  const contOf=rooms.map((r,i)=>i);
+  const findC=x=>{while(contOf[x]!==x)x=contOf[x]=contOf[contOf[x]];return x;};
+  for(let i=0;i<S.rooms.length;i++)for(let j=i+1;j<S.rooms.length;j++)
+    if(relOf(i,j)==='contiguo'){const a=findC(i),b=findC(j);if(a!==b)contOf[a]=b;}
+  const blocks={};
+  rooms.forEach((r,i)=>{const b=find(i);(blocks[b]=blocks[b]||[]).push(i);});
+  const bandCat=g=>{for(const c of ['publico','privado','servicio','nexo','resto'])
+    if(g.some(i=>rooms[i].cat===c))return c;return 'publico';};
+  let order=[];
+  catSeq.forEach(c=>{
+    const gs=Object.keys(blocks).map(k=>blocks[k]).filter(g=>bandCat(g)===c);
+    shuffle(gs,rng);
+    const slim=g=>g.some(i=>Math.max(rooms[i].a,rooms[i].b)/Math.min(rooms[i].a,rooms[i].b)>=3)?0:1;
+    gs.sort((x,y)=>slim(x)-slim(y));
+    gs.forEach(g=>{if(g.length>1)shuffle(g,rng);order=order.concat(g);});});
+  // los bloques no pueden partirse entre regiones: se marcan sus fronteras
+  const breakable=new Uint8Array(order.length+1).fill(1);
+  for(let k=1;k<order.length;k++)
+    if(find(order[k])===find(order[k-1]))breakable[k]=0;
+  // asignar locales a regiones mediante cortes en la lista ordenada
+  const NR=regs.length;
+  if(order.length<NR)return null;
+  const cap=regs.map(R=>R.w*R.h);
+  const lo=i=>minArea(rooms[i]);
+  const hi=i=>effMax(rooms[i],GF);
+  const nextCut=k=>{let q=Math.max(1,k);while(q<order.length&&!breakable[q])q++;return q;};
+  const cuts=[0];
+  {let acc=0,ri=0;
+   for(let k=0;k<order.length;k++){
+     acc+=target[order[k]];
+     if(ri<NR-1&&acc>=cap[ri]-1e-9&&breakable[k+1]&&order.length-(k+1)>=NR-1-ri){
+       cuts.push(k+1);ri++;acc=0;}}
+   while(cuts.length<NR)cuts.push(nextCut(cuts[cuts.length-1]+1));
+   cuts.length=NR;cuts.push(order.length);}
+  const sumLo=r=>{let s=0;for(let k=cuts[r];k<cuts[r+1];k++)s+=lo(order[k]);return s;};
+  const sumHi=r=>{let s=0;for(let k=cuts[r];k<cuts[r+1];k++)s+=hi(order[k]);return s;};
+  for(let it=0;it<120;it++){
+    let ch=false;
+    for(let r=0;r<NR;r++){
+      const n=cuts[r+1]-cuts[r];
+      const canDown=k=>k>0&&k<order.length&&breakable[k];
+      if(n>1&&sumLo(r)>cap[r]+1e-6){
+        if(r<NR-1&&canDown(cuts[r+1]-1)){cuts[r+1]--;ch=true;}
+        else if(cuts[r]<cuts[r+1]-1&&canDown(cuts[r]+1)){cuts[r]++;ch=true;}
+      }else if(sumHi(r)<cap[r]-1e-6||n===0){
+        if(r<NR-1&&cuts[r+2]-cuts[r+1]>1&&canDown(cuts[r+1]+1)){cuts[r+1]++;ch=true;}
+        else if(r>0&&cuts[r]-cuts[r-1]>1&&canDown(cuts[r]-1)){cuts[r]--;ch=true;}}
+    }
+    if(!ch)break;
+  }
+  const groups=[];
+  for(let r=0;r<NR;r++)groups.push(order.slice(cuts[r],cuts[r+1]));
+  if(groups.some(g=>!g.length))return null;
+  // ── asignación por compatibilidad ─────────────────────────────────────
+  // El reparto por cortes ordena por categoría y acumula superficie: no sabe si
+  // el local CABE físicamente en la franja que le toca. Era la primera causa de
+  // «cero candidatas» —1.128 de 1.200 intentos morían en la comprobación de
+  // abajo—. Intercambiar bloques por pares no basta: la búsqueda se queda en
+  // mesetas. Aquí se resuelve exacto: emparejamiento bipartito (Kuhn) para que
+  // toda franja reciba un bloque que le quepa, y el resto de bloques a la franja
+  // con más holgura. Se mueven BLOQUES enteros, así que «contiguo» no se parte.
+  const cabeEn=(i,r)=>{const R=regs[r],a=rooms[i].a,b=rooms[i].b;
+    return (R.w>=a-1e-4&&R.h>=b-1e-4)||(R.w>=b-1e-4&&R.h>=a-1e-4);};
+  const nMal=()=>{let n=0;groups.forEach((g,r)=>g.forEach(i=>{if(!cabeEn(i,r))n++;}));return n;};
+  if(nMal()){
+    const bloques=[],idx={};
+    order.forEach(i=>{const k=String(i<blockOf.length?find(i):i);
+      if(idx[k]===undefined){idx[k]=bloques.length;bloques.push([]);}
+      bloques[idx[k]].push(i);});
+    const NB=bloques.length;
+    const cabeB=(b,r)=>bloques[b].every(i=>cabeEn(i,r));
+    const deBloque=new Int32Array(NB).fill(-1);       // bloque → región asignada
+    const kuhn=(r,vis)=>{
+      for(let b=0;b<NB;b++){
+        if(vis[b]||!cabeB(b,r))continue;
+        vis[b]=1;
+        if(deBloque[b]<0||kuhn(deBloque[b],vis)){deBloque[b]=r;return true;}}
+      return false;};
+    let ok=NB>=NR;
+    for(let r=0;r<NR&&ok;r++)
+      if(!kuhn(r,new Uint8Array(NB)))ok=false;
+    if(!ok)return null;      // no existe reparto: alguna franja no admite nada
+    const ng=[];for(let r=0;r<NR;r++)ng.push([]);
+    const sumMin=g=>g.reduce((t,i)=>t+minArea(rooms[i]),0);
+    for(let b=0;b<NB;b++){
+      let r=deBloque[b];
+      if(r<0){
+        let mejor=-1,holgura=-1e18;
+        for(let q=0;q<NR;q++){
+          if(!cabeB(b,q))continue;
+          const h=cap[q]-sumMin(ng[q]);
+          if(h>holgura){holgura=h;mejor=q;}}
+        if(mejor<0)return null;
+        r=mejor;}
+      bloques[b].forEach(i=>ng[r].push(i));}
+    if(ng.some(g=>!g.length))return null;
+    for(let r=0;r<NR;r++)groups[r]=ng[r];
+  }
+  for(let r=0;r<NR;r++){                       // el local debe caber en su región
+    const w=regs[r].w,h=regs[r].h;
+    for(const i of groups[r]){
+      const a=rooms[i].a,b=rooms[i].b;
+      if(!((w>=a-1e-4&&h>=b-1e-4)||(w>=b-1e-4&&h>=a-1e-4)))return null;}}
+  // Ajustar superficies dentro de cada región. Si los topes de la región no
+  // llegan a cubrirla, el sobrante NO se reparte por encima de los máximos:
+  // se declara superficie libre en esa misma región.
+  // Array normal, no tipado: durante el reparto pueden añadirse locales
+  // «resto» por región, y con Float64Array su índice caía fuera y su
+  // superficie objetivo se perdía en silencio.
+  const areaOf=[];
+  const extraFree=[];
+  groups.forEach((g,r)=>{
+    if(!g.length)return;
+    const A=regs[r].w*regs[r].h;
+    const sub=g.map(i=>rooms[i]);
+    const capTot=sub.reduce((s,x)=>s+effMax(x,GF),0);
+    if(capTot<A-0.5){
+      const libre={name:'Superficie libre',cat:'resto',a:1.2,b:1.2,
+        maxArea:(A-capTot)*1.5+2,elast:0,entry:'prohibida',open:'libre',orient:''};
+      rooms=rooms.concat([libre]);
+      const idx=rooms.length-1;
+      g.push(idx);extraFree.push(idx);blockOf.push(idx);free=true;}
+    const sub2=g.map(i=>rooms[i]);
+    const pr2=programTargets(sub2,A,GF);
+    g.forEach((i,k)=>areaOf[i]=pr2.t[k]);});
+  function regZoneDummy(){}
+  // subdividir cada región
+  const shapes=rooms.map(()=>[]);
+  let bad=false;
+  groups.forEach((g,r)=>{
+    if(bad)return;
+    if(!g.length)return;
+    let items=g.map(i=>({i,area:areaOf[i]||minArea(rooms[i]),
+      a:rooms[i].a,b:rooms[i].b,cat:rooms[i].cat,
+      // mx es el máximo ESCRITO por el usuario, no el sobre de búsqueda interno.
+      // Usar el sobre aquí lo convertía en regla dura dentro de la geometría y
+      // asfixiaba las plantas ajustadas: un rectángulo de 14×10 con el preset de
+      // oficina (123 m² de mínimos en 140 m²) daba 0 candidatas de 480.
+      blk:(i<blockOf.length?find(i):i),
+      // El tope geométrico es el máximo ESCRITO. Si no lo hay, un tope generoso
+      // que orienta sin estrangular: antes se usaba aquí el sobre de búsqueda
+      // interno como RECHAZO DURO y eso asfixiaba las plantas ajustadas (un
+      // 16×10 con el preset de oficina daba 38 candidatas y 0 válidas). Quitarlo
+      // del todo dejaba locales a 8,69× su mínimo. Barrido: 2,5×mínimo da la
+      // mejor cobertura (380 construidas, 177 válidas) y acota en 3,00×.
+      mx:rooms[i].maxArea?Math.max(rooms[i].maxArea,minArea(rooms[i]))
+         :Math.max(effMax(rooms[i],GF),2.5*minArea(rooms[i]))}));
+    // nexos y locales muy alargados encabezan la región: se llevan una franja
+    // completa. Se reordena por BLOQUES, nunca por locales sueltos, para que un
+    // bloque contiguo no quede partido en el array.
+    const slim=t=>t.cat==='nexo'||Math.max(t.a,t.b)/Math.min(t.a,t.b)>=3;
+    {const byBlk={},ord=[];
+     items.forEach(t=>{if(!byBlk[t.blk]){byBlk[t.blk]=[];ord.push(t.blk);}byBlk[t.blk].push(t);});
+     const isSlim=b=>byBlk[b].some(slim);
+     ord.sort((x,y)=>(isSlim(y)?1:0)-(isSlim(x)?1:0));
+     items=[];ord.forEach(b=>{items=items.concat(byBlk[b]);});}
+    let leaves=null;
+    // crujías: siempre que la región tenga nexo. Si falla, cae en subdivisión.
+    if(items.some(t=>t.cat==='nexo'))leaves=layoutCorridor(regs[r],items,rng);
+    if(!leaves)leaves=layout(regs[r],items,rng,prop,noise);
+    if(!leaves){bad=true;return;}
+    leaves.forEach(L=>shapes[L.i].push(L.rect));});
+  if(bad||shapes.some(s=>!s.length))return null;
+  // anexión de piezas sueltas: sólo si el local conserva su rectángulo funcional
+  // y la pata tiene ancho útil. Máximo dos piezas por local.
+  const legMin=r=>{
+    const m=Math.min(r.a,r.b);
+    const base=Math.max(0.9,Math.min(1.5,0.5*m));
+    return (r.cat==='publico'||r.cat==='privado')?Math.max(1.2,base):base;};
+  const leftovers=[];
+  annex.forEach(A=>{
+    let bi=-1,bl=0;
+    const areaA=A.w*A.h;
+    shapes.forEach((rs,i)=>{
+      if(rs.length>=2)return;                        // ya es una L
+      if(rooms[i].cat==='resto')return;
+      if(Math.min(A.w,A.h)<legMin(rooms[i])-1e-4)return;
+      if(!fits(rs[0],rooms[i]))return;               // debe conservar su a×b
+      // y no puede pasarse de su tope al sumarle el apéndice
+      const actual=rs.reduce((s,R)=>s+R.w*R.h,0);
+      if(actual+areaA>effMax(rooms[i],GF)+0.15)return;
+      rs.forEach(B=>{const c=rectAdj(A,B);
+        if(c&&c.len>bl&&c.len>=legMin(rooms[i])-1e-4){bl=c.len;bi=i;}});});
+    if(bi>=0)shapes[bi].push(A);else leftovers.push(A);});
+  // intercambio: si un local no cabe en su rectángulo, se prueba permutar con otro
+  const fitsRoom=(R,i)=>fits(R,rooms[i]);
+  // El máximo automático se valida después como regla dura, así que el
+  // intercambio tiene que respetarlo igual que el escrito: si sólo mira
+  // maxArea, fabrica a conciencia candidatas que sabe que van a fallar.
+  const inR=(R,i)=>{const A=R.w*R.h;
+    return A>=minArea(rooms[i])-0.15&&A<=effMax(rooms[i],GF)+0.15;};
+  for(let pass=0;pass<3;pass++){
+    let ch=false;
+    for(let i=0;i<rooms.length;i++){
+      if(shapes[i].length!==1)continue;
+      const Ri=shapes[i][0];
+      if(fitsRoom(Ri,i)&&inR(Ri,i))continue;
+      for(let j=0;j<rooms.length;j++){
+        if(j===i||shapes[j].length!==1)continue;
+        const Rj=shapes[j][0];
+        const before=(fitsRoom(Ri,i)?1:0)+(fitsRoom(Rj,j)?1:0)+(inR(Ri,i)?1:0)+(inR(Rj,j)?1:0);
+        const after =(fitsRoom(Rj,i)?1:0)+(fitsRoom(Ri,j)?1:0)+(inR(Rj,i)?1:0)+(inR(Ri,j)?1:0);
+        if(after>before){shapes[i]=[Rj];shapes[j]=[Ri];ch=true;break;}}}
+    if(!ch)break;
+  }
+  const freeArea=leftovers.reduce((s,r)=>s+r.w*r.h,0);
+
+  // ── acceso: en un local que lo admita, sobre un lado exterior que lo permita
+  const info=rooms.map((r,i)=>{
+    const rs=shapes[i],edges=roomEdges(rs);
+    let frags=[];
+    edges.forEach(e=>{frags=frags.concat(edgeFragments(e));});
+    const fac=frags.filter(f=>f.wall==='fachada');
+    return {i,rs,edges,
+      facMax:fac.length?Math.max(...fac.map(f=>f.len)):0,
+      facTot:fac.reduce((s,f)=>s+f.len,0),
+      bearings:fac.map(f=>({b:f.bearing,len:f.len})),
+      entradas:fac.filter(f=>f.entry)};});
+  let ent=null,bscore=-1e18;
+  const wantEntry=r=>r.entry||ENTRY_DEF[r.cat]||'prohibida';
+  info.forEach(f=>{
+    const pref=wantEntry(rooms[f.i]);
+    if(pref==='prohibida')return;
+    const bonus={obligatoria:1e6,preferente:ENTRY_PREF*plantDiag(),permitida:0}[pref]||0;
+    f.entradas.forEach(e=>{
+      const dx=e.x2-e.x1,dy=e.y2-e.y1,L=Math.hypot(dx,dy);
+      // mismo criterio que projPerim() y prechecks(): una puerta necesita su
+      // ancho MÁS la holgura libre en cada extremo, también aquí
+      if(!sideFitsDoor(L,doorW))return;
+      const half=(doorW/2+DOOR_END_CLEAR)/L;
+      let t=((S.door.x-e.x1)*dx+(S.door.y-e.y1)*dy)/(L*L);
+      t=Math.max(half,Math.min(1-half,t));
+      const p={x:e.x1+dx*t,y:e.y1+dy*t},d=Math.hypot(p.x-S.door.x,p.y-S.door.y);
+      const sc=bonus-d;
+      if(sc>bscore){bscore=sc;ent={room:f.i,p,dir:{x:dx/L,y:dy/L},d,pref};}});});
+  const obligatorias=rooms.filter(r=>wantEntry(r)==='obligatoria').length;
+  if(!ent)return null;
+  if(obligatorias&&wantEntry(rooms[ent.room])!=='obligatoria')return null;
+
+  const dp=doorPlan(rooms,shapes,doorW,ent.room,relaxSet);
+  const out=rooms.map((r,i)=>{
+    const f=info[i],rs=f.rs,A=rs.reduce((s,R)=>s+R.w*R.h,0);
+    const big=rs.reduce((a,b)=>a.w*a.h>b.w*b.h?a:b);
+    const lo=minArea(r);
+    const hi=searchCap(r,GF);                      // sobre de búsqueda (interno)
+    const hiDecl=r.maxArea?Math.max(r.maxArea,lo):Infinity;  // máximo declarado
+    const need=Math.min(1.5,Math.min(r.a,r.b));
+    const wantsFac=r.cat==='publico'||r.cat==='privado';
+    return{i,name:r.name,cat:r.cat,rects:rs,edges:f.edges,
+      ext:f.facTot,facMax:f.facMax,bearings:f.bearings,
+      area:A,w:big.w,h:big.h,a:r.a,b:r.b,lo,hi,hiDecl,auto:!r.maxArea,
+      target:pr.t[i]||lo,
+      ok:fits(big,r),                                   // rectángulo funcional siempre
+      // La regla DURA de superficie es la del programa: no bajar del mínimo y
+      // no pasar del máximo que el usuario escribió. El sobre de búsqueda es
+      // interno del motor y no se presenta como condición arquitectónica.
+      inRange:A>=lo-0.15&&A<=hiDecl+0.15,
+      inCap:A<=hi+0.15,
+      light:!wantsFac||f.facMax>=need-1e-4,
+      doors:dp.deg[i],conn:dp.reach[i],via:dp.par[i],depth:dp.depth[i]};});
+
+  const R=out.length,hasNexo=rooms.some(r=>r.cat==='nexo');
+  const real=out.filter(r=>r.cat!=='resto');
+  const N=real.length||1;
+
+  // ── reglas duras
+  // Se valida sobre el grafo FINAL de puertas, no sobre el padre del árbol:
+  // «abre a: sólo nexo» significa que TODAS sus puertas interiores dan a un
+  // nexo, no sólo aquella por la que se le alcanzó. Es la MISMA condición que
+  // usó la generación, así que una planta incorrecta no puede colarse aunque
+  // el generador se equivoque. La entrada exterior no es puerta entre locales.
+  const openOk=r=>{
+    if(r.cat==='resto')return true;
+    const modo=rooms[r.i].open||OPEN_DEF[r.cat]||'libre';
+    if(modo==='libre')return true;
+    if(!r.conn)return false;
+    return dp.gAdj[r.i].every(v=>doorAllowed(rooms,r.i,v,relaxSet,hasNexo));};
+  out.forEach(r=>{
+    r.openOk=openOk(r);
+    r.privOk=r.cat!=='privado'||(r.doors<=1&&r.via>=0);
+    r.clean=r.cat==='resto'||(r.ok&&r.inRange&&r.conn&&r.light&&r.openOk&&r.privOk);});
+  const adjLen=(i,j)=>{let L=0;
+    out[i].rects.forEach(A=>out[j].rects.forEach(B=>{const c=rectAdj(A,B);if(c)L+=c.len;}));return L;};
+  // «contiguo» es literal: frontera común de al menos un paso de puerta
+  const contigFails=[];
+  for(let i=0;i<S.rooms.length;i++)for(let j=i+1;j<S.rooms.length;j++){
+    if(relOf(i,j)!=='contiguo')continue;
+    if(adjLen(i,j)<doorW-1e-4)contigFails.push(rooms[i].name+'–'+rooms[j].name);}
+  const hard={
+    lados:real.every(r=>r.ok),
+    superficie:real.every(r=>r.inRange),
+    acceso:out.filter(r=>r.cat!=='resto').every(r=>r.conn),
+    fachada:real.every(r=>r.light),
+    apertura:real.every(r=>r.openOk&&r.privOk),
+    contiguidad:contigFails.length===0};
+  const valid=Object.keys(hard).every(k=>hard[k]);
+
+  // ── dimensiones de calidad (sólo ordenan; no repiten las duras)
+  //  1 · relaciones declaradas
+  // Distancia real en el grafo de puertas (BFS) —el mismo que usa doorPlan para
+  // la profundidad—, no diferencia de profundidades: dos locales a profundidad 5
+  // en ramas distintas están lejos, no cerca.
+  const gAdj=dp.gAdj;
+  const hops=(src)=>{const d=new Float64Array(R).fill(Infinity),q=[src];d[src]=0;
+    for(let h=0;h<q.length;h++)for(const m of gAdj[q[h]])if(!isFinite(d[m])){d[m]=d[q[h]]+1;q.push(m);}
+    return d;};
+  const hopCache={};
+  const stepsBetween=(i,j)=>{if(!hopCache[i])hopCache[i]=hops(i);return hopCache[i][j];};
+  // «contiguo» NO puntúa: es regla dura (hard.contiguidad) y todas las plantas
+  // válidas la cumplen por obligación, así que ocuparía parte de qRel con una
+  // constante. Aquí sólo entran las preferencias: próximo y evitar.
+  let relN=0,relS=0;const relFail=[];
+  const pasos={1:0,2:0,3:0,mas:0};
+  for(let i=0;i<S.rooms.length;i++)for(let j=i+1;j<S.rooms.length;j++){
+    const v=relOf(i,j);
+    if(v==='indiferente'||v==='contiguo')continue;
+    relN++;
+    const L=adjLen(i,j),steps=stepsBetween(i,j);
+    let sc=0;
+    if(v==='proximo')sc=steps<=1?1:(steps===2?0.85:(steps===3?0.4:0));
+    else if(v==='evitar'){
+      sc=(L<0.2&&steps>2)?1:(L<0.2?0.6:0);
+      // distribución de distancia topológica de los pares «evitar»: pasar de
+      // adyacencia física a «separados por una puerta» ya es una mejora
+      if(!isFinite(steps))pasos.mas++;
+      else if(steps<=1)pasos[1]++;else if(steps===2)pasos[2]++;
+      else if(steps===3)pasos[3]++;else pasos.mas++;}
+    relS+=sc;
+    if(sc<0.5)relFail.push(rooms[i].name+'–'+rooms[j].name);}
+  const qRel=relN?relS/relN:null;
+
+  //  2 · circulación
+  const depths=out.filter(r=>r.cat!=='resto').map(r=>r.depth).filter(d=>isFinite(d));
+  const dMax=depths.length?Math.max(...depths):0;
+  const wDepth={publico:3,privado:2,servicio:1,nexo:0.5,resto:0};
+  let dw=0,ww=0;
+  out.forEach(r=>{const w=wDepth[r.cat]||1;if(isFinite(r.depth)){dw+=r.depth*w;ww+=w;}});
+  const dAvg=ww?dw/ww:0;
+  // superficie de NEXO, no «circulación real»: si el paso cruza un estar, ese
+  // recorrido no aparece aquí. Es un indicador, no una medida de circulación.
+  const circArea=out.filter(r=>r.cat==='nexo').reduce((s,r)=>s+r.area,0);
+  const circPct=usable>0?circArea/usable:0;
+  const qCirc=Math.max(0,1-Math.max(0,dAvg-1.6)/2.6)*0.6+
+              Math.max(0,1-Math.max(0,dMax-3)/3)*0.4;
+
+  //  3 · fidelidad al reparto objetivo (sustituye al antiguo «equilibrio»)
+  const qProg=real.reduce((s,r)=>s+Math.max(0,1-Math.abs(r.area-r.target)/Math.max(1,r.target)),0)/N;
+
+  //  4 · fachada y orientación
+  // sólo promedia sobre los locales que REALMENTE exigen fachada; si no hay
+  // ninguno, el criterio queda inactivo y se renormaliza más abajo.
+  const facReq=real.filter(r=>r.cat==='publico'||r.cat==='privado');
+  const qFac=facReq.length?facReq.reduce((s,r)=>{
+    const need=Math.min(1.5,Math.min(r.a,r.b));
+    return s+Math.min(1,r.facMax/Math.max(0.5,need*1.8));},0)/facReq.length:null;
+  const DIRS={N:0,NE:45,E:90,SE:135,S:180,SO:225,O:270,NO:315};
+  // desviación angular mínima entre el rumbo de cada tramo de fachada y el
+  // deseado; se pondera por longitud de tramo y se anula pasados los 90°.
+  const angDiff=(x,y)=>{const d=Math.abs(((x-y)%360+360)%360);return d>180?360-d:d;};
+  let orN=0,orS=0;
+  real.forEach(r=>{
+    const want=rooms[r.i].orient;if(!want||!(want in DIRS))return;
+    orN++;
+    if(!r.bearings.length)return;
+    const tot=r.bearings.reduce((s,b)=>s+b.len,0)||1;
+    let acc=0;
+    r.bearings.forEach(b=>{
+      acc+=Math.max(0,1-angDiff(b.b,DIRS[want])/90)*b.len/tot;});
+    orS+=Math.min(1,acc);});
+  const qOrient=orN?orS/orN:null;
+
+  //  5 · calidad geométrica
+  const qGeom=real.reduce((s,r)=>{
+    const want=Math.max(r.a,r.b)/Math.min(r.a,r.b);
+    const got=Math.max(r.w,r.h)/Math.max(0.01,Math.min(r.w,r.h));
+    const pen=r.rects.length>1?0.12:0;
+    return s+Math.max(0,1-Math.abs(got-want)/4)-pen;},0)/N;
+
+  //  6 · entrada y agrupación
+  const qEnt={obligatoria:1,preferente:1,permitida:0.7}[ent.pref]*
+    Math.max(0,1-ent.d/(ENT_SPAN*plantDiag()));
+  let same=0,tot=0;
+  for(let i=0;i<R;i++)for(let j=i+1;j<R;j++){
+    const L=adjLen(i,j);
+    if(L>0){tot+=L;if(out[i].cat===out[j].cat)same+=L;}}
+  const qGrp=tot>0?same/tot:1;
+
+  // Sólo puntúan los criterios ACTIVOS: los inactivos se excluyen y los pesos se
+  // renormalizan, para que los criterios sin datos no inflen ni penalicen
+  // artificialmente la nota. Esto NO hace que un 80 sea comparable entre
+  // programas distintos; sólo evita premiar el no haber declarado nada.
+  const terms=[[qRel,0.30,relN>0],[qCirc,0.20,true],[qProg,0.15,true],
+    [qFac,0.09,facReq.length>0],[qOrient,0.06,orN>0],
+    // «entrada» sube de 0,05 a 0,10: el marcador lo pone el usuario a mano, como
+    // una relación declarada, y con 0,05 la selección no llegaba a verlo. Barrido
+    // sobre el caso de la oficina en L: con 0,05 la primera opción abre a 6,09 m
+    // del marcador; desde 0,10 abre a 0,00 m, y 0,15/0,20/0,30/0,45 dan lo mismo.
+    [qGeom,0.10,true],[qEnt,0.10,true],[qGrp,0.05,tot>0]];
+  let acc=0,wsum=0;
+  terms.forEach(([v,w,on])=>{if(on&&v!=null){acc+=v*w;wsum+=w;}});
+  const score=wsum>0?100*acc/wsum:0;
+  const active={rel:relN>0,fac:facReq.length>0,orient:orN>0,grp:tot>0};
+  return{rooms:out,doors:dp.doors,start:ent.room,entrance:ent,valid,hard,free,
+    score,qRel,qCirc,qProg,qFac,qOrient,qGeom,qEnt,qGrp,active,relFail,contigFails,
+    evitPasos:pasos,
+    dMax,dAvg,circPct,relN,
+    leftover:Math.max(0,area()-usable)+freeArea,
+    relaxUsed:Object.assign({},relaxSet)};
+}
+
+/* ═════════ comprobación previa de viabilidad ═════════ */
+// Devuelve SÓLO condiciones necesarias demostrables. Si ninguna se incumple,
+// la ausencia de resultados significa «no encontrada», nunca «no existe».
+// Devuelve {imposible:[], fueraDelMotor:[]}.
+//  · imposible      → condiciones necesarias que no pueden cumplirse: no existe
+//                     planta con estos datos, y se puede demostrar.
+//  · fueraDelMotor  → el caso queda fuera de la familia de particiones que este
+//                     motor explora. NO demuestra que la planta no exista.
+function prechecks(){
+  const out=[],mot=[];
+  const ret=()=>({imposible:out,fueraDelMotor:mot});
+  if(!S.closed||S.pts.length<3){out.push('el perímetro no está cerrado');return ret();}
+  // perímetro ortogonal: el motor sólo reparte rectángulos alineados
+  const n=S.pts.length;let obl=0,degen=0;
+  for(let i=0;i<n;i++){
+    const a=S.pts[i],b=S.pts[(i+1)%n];
+    const L=dist(a,b);
+    if(L<0.02){degen++;continue;}
+    if(Math.abs(b.x-a.x)>1e-3&&Math.abs(b.y-a.y)>1e-3)obl++;}
+  if(degen)out.push(`hay ${degen} lado(s) de longitud casi nula`);
+  if(obl)mot.push(`el contorno tiene ${obl} lado(s) oblicuo(s): este motor sólo reparte perímetros ortogonales`);
+  if(selfIntersects())out.push('el contorno se cruza consigo mismo');
+  if(!S.rooms.length){out.push('no hay locales en el programa');return ret();}
+  const A=area(),sm=S.rooms.reduce((s,r)=>s+minArea(r),0);
+  if(sm>A+1e-6)out.push(`la suma de superficies mínimas (${nf(sm,1)} m²) supera la planta (${nf(A,1)} m²)`);
+  // ningún local cabe en ninguna banda posible
+  const regsV=slabs(S.pts,true),regsH=slabs(S.pts,false);
+  const cabe=(r,regs)=>regs.some(R=>(R.w>=r.a-1e-4&&R.h>=r.b-1e-4)||(R.w>=r.b-1e-4&&R.h>=r.a-1e-4));
+  S.rooms.forEach(r=>{
+    if(!cabe(r,regsV)&&!cabe(r,regsH))
+      mot.push(`«${r.name}» (${nf(r.a,2)}×${nf(r.b,2)}) no cabe en ninguna de las franjas `+
+        `rectangulares en que este motor descompone la planta`);});
+  // ── coherencia del PROGRAMA ───────────────────────────────────────────
+  // Las nueve comprobaciones anteriores miran el dibujo. Ninguna miraba el
+  // programa, que es lo que el usuario edita. Estos casos son imposibilidades
+  // DEMOSTRABLES y se estaban reportando como «no encontrado en esta búsqueda»,
+  // invitando a subir ensayos y cambiar la semilla sobre algo que no existe.
+  const wantE=r=>r.entry||ENTRY_DEF[r.cat]||'prohibida';
+  if(!S.rooms.some(r=>wantE(r)!=='prohibida'))
+    out.push('ningún local admite la entrada: todos están en «entrada: prohibida» '+
+      '(es el valor por defecto de privado y servicio)');
+  // un local que no cabe en la planta entera no es «fuera del alcance»: no existe
+  const bb=(()=>{const xs=S.pts.map(p=>p.x),ys=S.pts.map(p=>p.y);
+    return {w:Math.max(...xs)-Math.min(...xs),h:Math.max(...ys)-Math.min(...ys)};})();
+  S.rooms.forEach(r=>{
+    if(!((bb.w>=r.a-1e-4&&bb.h>=r.b-1e-4)||(bb.w>=r.b-1e-4&&bb.h>=r.a-1e-4)))
+      out.push(`«${r.name}» (${nf(r.a,2)}×${nf(r.b,2)}) no cabe en la planta`);});
+  // el local de arranque nunca puede ser privado: un privado no es espacio de paso
+  const obgPriv=S.rooms.filter(r=>r.entry==='obligatoria'&&r.cat==='privado');
+  if(obgPriv.length)
+    out.push(`«${obgPriv[0].name}» es privado y tiene la entrada obligatoria: `+
+      `un privado no puede ser el local de acceso, porque no es espacio de paso`);
+  // dos privados no pueden abrirse el uno al otro, así que solos quedan sueltos
+  const priv=S.rooms.filter(r=>r.cat==='privado').length;
+  if(priv>=2&&priv===S.rooms.length)
+    out.push('el programa son sólo locales privados: un privado no puede abrir a '+
+      'otro privado, así que no hay forma de conectarlos');
+  // «abre sólo a nexo» sin ningún nexo declarado: no es imposible, pero sólo se
+  // resuelve cediendo en esa regla, y conviene decirlo antes de buscar
+  const hayNexo=S.rooms.some(r=>r.cat==='nexo');
+  const soloNexo=S.rooms.filter(r=>(r.open||OPEN_DEF[r.cat])==='nexo');
+  if(soloNexo.length&&!hayNexo)
+    mot.push(`${soloNexo.length} local(es) tienen «abre a: sólo nexo» y en el programa `+
+      `no hay ningún local de categoría nexo: esa regla sólo podrá cumplirse cediendo `+
+      `en ella (último escalón), o añadiendo un nexo (pasillo, distribuidor, vestíbulo)`);
+  // entrada obligatoria: sólo puede haber una
+  const obg=S.rooms.filter(r=>r.entry==='obligatoria');
+  if(obg.length>1)out.push(`hay ${obg.length} locales con entrada obligatoria; el modelo admite una sola entrada principal`);
+  // debe existir algún lado exterior que admita entrada
+  syncSides();
+  const dW=parseFloat($('#door').value)||0.85;
+  let hayPuerta=false;
+  for(let i=0;i<n;i++){const sd=sideAt(i);
+    if(sd.wall==='fachada'&&sd.entry&&sideFitsDoor(dist(S.pts[i],S.pts[(i+1)%n]),dW))hayPuerta=true;}
+  if(!hayPuerta)out.push(`ningún lado exterior admite la entrada: todos son medianeros, `+
+    `están marcados sin acceso, o miden menos de ${nf(dW+2*DOOR_END_CLEAR,2)} m `+
+    `(el paso de puerta más ${nf(DOOR_END_CLEAR*100,0)} cm libres en cada extremo)`);
+  return ret();
+}
+function selfIntersects(){
+  const n=S.pts.length;
+  const cross=(p,q,r,s)=>{
+    const d=(q.x-p.x)*(s.y-r.y)-(q.y-p.y)*(s.x-r.x);
+    if(Math.abs(d)<1e-12)return false;
+    const t=((r.x-p.x)*(s.y-r.y)-(r.y-p.y)*(s.x-r.x))/d;
+    const u=((r.x-p.x)*(q.y-p.y)-(r.y-p.y)*(q.x-p.x))/d;
+    return t>1e-6&&t<1-1e-6&&u>1e-6&&u<1-1e-6;};
+  for(let i=0;i<n;i++)for(let j=i+2;j<n;j++){
+    if(i===0&&j===n-1)continue;
+    if(cross(S.pts[i],S.pts[(i+1)%n],S.pts[j],S.pts[(j+1)%n]))return true;}
+  return false;
+}
+
+/* ═════════ generar ═════════ */
+function run(){
+  if(!S.closed||!S.rooms.length)return;
+  syncSides();
+  S.stale=null;
+  const pre=prechecks();
+  S.blockers=pre.imposible;S.outOfScope=pre.fueraDelMotor;
+  if(S.blockers.length||S.outOfScope.length){
+    S.options=[];S.sel=-1;S.pool=null;S.hasValid=false;S.hasStrict=false;
+    renderResults();hint();draw();return;}
+  if(!S.door)reprojectDoor();
+  const prop=parseFloat($('#wProp').value);
+  const noise=parseFloat($('#wNoise').value);
+  const tries=Math.max(6,Math.min(400,parseInt($('#tries').value)||120));
+  const maxOpts=Math.max(1,Math.min(16,parseInt($('#maxOpts').value)||10));
+  const doorW=parseFloat($('#door').value)||0.85;
+  const base=parseInt($('#seed').value)||1;
+  // Escala de relajación declarada: primero los topes automáticos, y en último
+  // lugar la apertura por nexo. Sólo se desciende si NO hay ninguna solución
+  // estricta: las reglas no ceden para llenar la galería. «Próximo» no aparece
+  // porque es una preferencia, y una preferencia no se relaja. Los lados
+  // mínimos, la fachada y la contigüidad NUNCA ceden.
+  // Ampliar el sobre de búsqueda NO es relajar una regla del programa: es
+  // dejar que el motor explore más lejos. Sólo el último escalón cede en algo
+  // declarado, y por eso es el único que se etiqueta como cesión.
+  const ladder=[
+    {topes:1,   apertura:false, tag:null, busq:'normal'},
+    {topes:1.8, apertura:false, tag:null, busq:'ampliada'},
+    {topes:3,   apertura:false, tag:null, busq:'muy ampliada'},
+    {topes:6,   apertura:true,  tag:'la apertura obligatoria por nexo', busq:'máxima'}];
+  const out=[],sigs=new Set();
+  let used=ladder[0];
+  for(const step of ladder){
+    used=step;
+    for(let k=0;k<tries;k++){
+      const rng0=mulberry(base*7919+k*104729+S.rooms.length*31+Math.round(step.topes*1000)+(step.apertura?77:0));
+      let o=null;
+      try{o=buildOption(rng0,prop,doorW,noise,step.topes,step);}catch(e){o=null;}
+      if(!o)continue;
+      o.step=step;o.relaxTag=step.tag;o.busq=step.busq;
+      const sig=o.rooms.map(r=>r.rects.map(R=>[R.x,R.y,R.w,R.h].map(v=>v.toFixed(1)).join()).join('|')).join('/');
+      if(sigs.has(sig))continue;
+      sigs.add(sig);out.push(o);}
+    // basta UNA solución estricta para no seguir bajando por la escala
+    if(out.filter(o=>o.valid).length>=1)break;}
+  const okOnes=out.filter(o=>o.valid);
+  // hasValid: hay alguna solución que cumple las duras en el escalón alcanzado.
+  // hasStrict: además, alguna no necesitó ceder en nada.
+  S.hasValid=okOnes.length>0;
+  // «estricta» = cumple TODO lo que el programa declara. Que el motor haya
+  // necesitado buscar más lejos no la hace menos estricta.
+  S.hasStrict=okOnes.some(o=>!o.relaxTag);
+  S.busqUsada=okOnes.length?okOnes[0].busq:(out.length?out[0].busq:null);
+  S.fails=null;
+  if(!S.hasValid&&out.length){
+    const f={};out.forEach(o=>Object.keys(o.hard).forEach(k=>{if(!o.hard[k])f[k]=(f[k]||0)+1;}));
+    S.fails=Object.keys(f).sort((a,b)=>f[b]-f[a]);
+    // qué locales son los culpables y de qué
+    const per={};
+    out.forEach(o=>o.rooms.forEach(r=>{
+      if(r.cat==='resto')return;
+      const q=per[r.name]=per[r.name]||{lados:0,sup:0,ciego:0,apert:0,n:0};
+      q.n++;if(!r.ok)q.lados++;if(!r.inRange)q.sup++;if(!r.light)q.ciego++;if(!r.openOk||!r.privOk)q.apert++;}));
+    S.culprits=Object.keys(per).map(k=>{
+      const q=per[k],worst=[['no caben sus lados',q.lados],['superficie fuera de rango',q.sup],
+        ['sin fachada',q.ciego],['no puede abrir donde debe',q.apert]].sort((a,b)=>b[1]-a[1])[0];
+      return {name:k,pct:worst[1]/q.n,why:worst[0]};})
+      .filter(x=>x.pct>0.5).sort((a,b)=>b.pct-a.pct).slice(0,3);}
+  const pool=(S.hasValid?okOnes:out).sort((a,b)=>b.score-a.score);
+  S.pool=pool;
+  S.yielded=(pool.length&&pool[0].step&&pool[0].step.tag)?pool[0].step.tag:null;
+  S.options=selectDiverse(pool,maxOpts);
+  S.sel=S.options.length?0:-1;
+  S.searched=true;S.blockers=null;S.outOfScope=null;
+  renderResults();refreshTotals();hint();draw();
+  $('#legend').style.display=S.sel>=0?'flex':'none';
+}
+// Arquetipos: campeón REAL de cada criterio sobre el conjunto completo. Si una
+// misma planta gana varios, aparece una vez con todas sus etiquetas; antes el
+// título se cedía a la segunda y la etiqueta quedaba siendo falsa.
+// «más compacta» era un nombre erróneo: qGeom mide fidelidad a la proporción
+// pedida, no compacidad (el perímetro exterior es el mismo en todas).
+const ARQ=[
+  {k:'score',  label:'equilibrada'},
+  {k:'qRel',   label:'mejores relaciones', needs:o=>o.active&&o.active.rel},
+  {k:'qCirc',  label:'mejor circulación'},
+  {k:'qFac',   label:'mejor fachada',      needs:o=>o.active&&o.active.fac},
+  {k:'qProg',  label:'más fiel al programa'},
+  {k:'qGeom',  label:'geometría más regular'}];
+function selectDiverse(pool,maxOpts){
+  const champ={};
+  ARQ.forEach(a=>{
+    let best=-1,bv=-1e18;
+    pool.forEach((o,idx)=>{
+      if(a.needs&&!a.needs(o))return;
+      const v=o[a.k];if(v==null)return;
+      if(v>bv+1e-9){bv=v;best=idx;}});
+    if(best>=0)(champ[best]=champ[best]||[]).push(a.label);});
+  const picked=[],seen=new Set();
+  Object.keys(champ).map(Number)
+    .sort((x,y)=>pool[y].score-pool[x].score)
+    .forEach(idx=>{
+      if(picked.length>=maxOpts)return;
+      pool[idx].tags=champ[idx];pool[idx].tag=champ[idx][0];
+      seen.add(idx);picked.push(pool[idx]);});
+  pool.forEach((o,idx)=>{           // el resto, por puntuación
+    if(picked.length>=maxOpts||seen.has(idx))return;
+    o.tags=null;o.tag=null;seen.add(idx);picked.push(o);});
+  return picked;
+}
+$('#bRun').onclick=()=>{const b=$('#bRun');b.textContent='Calculando…';b.disabled=true;
+  setTimeout(()=>{run();b.textContent='Generar distribuciones';refreshTotals();},20);};
+// Los parámetros de búsqueda también producen plantas distintas: cambiarlos
+// invalida lo que hay en pantalla igual que cambiar el programa.
+$('#wProp').oninput=e=>{$('#vProp').textContent=nf(parseFloat(e.target.value),1);
+  invalidate('has cambiado la proporción compacta');};
+$('#wNoise').oninput=e=>{$('#vNoise').textContent=nf(parseFloat(e.target.value),2);
+  invalidate('has cambiado la variación entre opciones');};
+$('#seed').onchange=()=>invalidate('has cambiado la semilla');
+$('#tries').onchange=()=>invalidate('has cambiado el número de ensayos');
+// «Opciones máx.» no altera la validez de ninguna planta: sólo cuántas se
+// muestran. Se rehace la selección sobre el mismo conjunto, sin regenerar.
+$('#maxOpts').onchange=()=>{
+  if(!S.pool||!S.pool.length)return;
+  const n=Math.max(1,Math.min(16,parseInt($('#maxOpts').value)||10));
+  S.options=selectDiverse(S.pool,n);
+  S.sel=S.options.length?0:-1;
+  renderResults();draw();};
+
+function renderResults(){
+  const box=$('#resbox');
+  // Tres respuestas distintas, no una: imposibilidad demostrada, límite del
+  // motor, y búsqueda sin éxito.
+  if((S.blockers&&S.blockers.length)||(S.outOfScope&&S.outOfScope.length)){
+    let m='';
+    if(S.blockers&&S.blockers.length)
+      m+='<div class="msg stop"><b>Programa incompatible.</b> Estas condiciones necesarias '+
+         'no pueden cumplirse, así que no existe ninguna planta con estos datos:<ul>'+
+         S.blockers.map(b=>'<li>'+b+'</li>').join('')+'</ul></div>';
+    if(S.outOfScope&&S.outOfScope.length)
+      m+='<div class="msg scope"><b>Fuera del alcance de este motor.</b> No demuestra que la '+
+         'planta no exista: sólo que queda fuera de la familia de particiones rectangulares '+
+         'que este generador explora.<ul>'+
+         S.outOfScope.map(b=>'<li>'+b+'</li>').join('')+'</ul></div>';
+    box.innerHTML=m;return;}
+  if(!S.options.length){
+    box.innerHTML=S.searched
+      ?'<div class="msg"><b>No se encontró ninguna solución</b> en esta búsqueda. Eso no demuestra que no exista: '+
+       'el motor es estocástico y explora una parte del espacio de plantas. Prueba a subir los ensayos, '+
+       'cambiar la semilla, aflojar algún lado mínimo o revisar las relaciones.</div>':'';
+    return;}
+  const o=S.options[S.sel],pct=v=>v==null?'—':Math.round(v*100)+'%';
+  const avisos=[];
+  if(S.stale)avisos.push('<div class="msg stale"><b>Resultados desactualizados</b> — '+S.stale+
+    '. Lo que ves corresponde al cálculo anterior. Vuelve a generar.</div>');
+  if(o.relaxTag)avisos.push('<div class="msg">Esta opción necesitó ceder en <b>'+o.relaxTag+
+    '</b>. Con todas las reglas activas no apareció ninguna solución en esta búsqueda.</div>');
+  else if(o.busq&&o.busq!=='normal')avisos.push('<div class="msg scope">Cumple todas las '+
+    'reglas del programa. Para encontrarla, el motor amplió su <b>búsqueda</b> ('+o.busq+
+    '): eso no relaja ninguna condición, sólo explora particiones más holgadas.</div>');
+  else if(S.hasValid&&!S.hasStrict)avisos.push('<div class="msg">Ninguna opción es estricta: '+
+    'todas han cedido en algún punto.</div>');
+  if(!S.hasValid){
+    let m='<div class="msg">Ninguna opción cumple las reglas duras; te muestro las más próximas.';
+    if(S.culprits&&S.culprits.length)
+      m+=' El problema se concentra en '+S.culprits.map(c=>'<b>'+c.name+'</b> ('+c.why+')').join(', ')+'.';
+    else m+=' Falla sobre todo: <b>'+S.fails.join('</b>, <b>')+'</b>.';
+    m+=' No es una demostración de imposibilidad: es el resultado de esta búsqueda.';
+    avisos.push(m+'</div>');}
+  if(o.contigFails&&o.contigFails.length)avisos.push('<div class="msg">Sin contigüidad real: <b>'+
+    o.contigFails.join('</b>, <b>')+'</b>.</div>');
+  if(o.leftover>0.5)avisos.push('<div class="msg">Quedan '+nf(o.leftover,1)+
+    ' m² sin asignar: rincones que no forman rectángulo útil.</div>');
+  const etiquetas=o.tags?o.tags.join(' · '):'opción '+String(S.sel+1).padStart(2,'0');
+  box.innerHTML=avisos.join('')+
+    `<div class="blockhead">opciones · ${S.options.length}</div><div class="opts"></div>
+    <div class="blockhead">${etiquetas}</div>
+    <div class="sc">
+      <div><b>${o.score.toFixed(0)}</b>valoración</div>
+      <div><b>${pct(o.qRel)}</b>relaciones${o.active.rel?'':' (inactivo)'}</div>
+      <div><b>${pct(o.qCirc)}</b>circulación</div>
+      <div><b>${pct(o.qProg)}</b>fidelidad</div>
+      <div><b>${pct(o.qFac)}</b>fachada${o.active.fac?'':' (inactivo)'}</div>
+      <div><b>${pct(o.qOrient)}</b>orientación${o.active.orient?'':' (inactivo)'}</div>
+      <div><b>${pct(o.qGeom)}</b>regularidad</div>
+      <div><b>${pct(o.qEnt)}</b>entrada</div>
+      <div><b>${pct(o.qGrp)}</b>agrupación</div>
+    </div>
+    <div class="circ">profundidad máx <b>${o.dMax}</b> puertas · media ponderada <b>${nf(o.dAvg,1)}</b> ·
+      superficie de nexo <b>${nf(o.circPct*100,1)}%</b>
+      ${o.circPct<0.08?' <span class="warn">escasa</span>':(o.circPct>0.18?' <span class="warn">excesiva</span>':'')}
+      <br><span style="color:var(--ink30)">la valoración renormaliza los pesos sobre los criterios activos</span></div>
+    <table class="m"><thead><tr><th>Local</th><th>medidas</th><th>m²</th><th>obj.</th><th>prof.</th><th>abre a</th></tr></thead>
+    <tbody>${o.rooms.map(r=>`<tr class="${r.clean?'':'fail'}">
+      <td class="n">${r.name}${r.light?'':' <span title="sin tramo continuo de fachada">◻</span>'}</td>
+      <td${r.ok?'':' style="color:var(--red);font-weight:600"'}>${nf(r.w,2)}×${nf(r.h,2)}${r.rects.length>1?' <span title="en L">⌐</span>':''}</td>
+      <td${r.inRange?'':' style="color:var(--red);font-weight:600"'}>${nf(r.area,1)}</td>
+      <td style="color:#98A3AC" title="${r.hiDecl&&isFinite(r.hiDecl)?'tope declarado '+nf(r.hiDecl,1)+' m²':'sin tope declarado'} · sobre de búsqueda ${nf(r.hi,1)} m²">${nf(r.target,1)}</td>
+      <td>${isFinite(r.depth)?r.depth:'—'}</td>
+      <td${r.openOk?'':' style="color:var(--red)"'}>${r.conn?(r.via>=0?o.rooms[r.via].name:'entrada'):'sin acceso'}</td></tr>`).join('')}</tbody></table>`;
+  const holder=box.querySelector('.opts');
+  S.options.forEach((op,i)=>{
+    const d=document.createElement('div');d.className='opt'+(i===S.sel?' sel':'');
+    const cap=op.tags?op.tags[0]:String(i+1).padStart(2,'0');
+    d.innerHTML=`<canvas></canvas><div class="cap"><span>${cap}${op.relaxTag?' ⚑':''}</span><span>${op.score.toFixed(0)}</span></div>`;
+    d.onclick=()=>{S.sel=i;renderResults();refreshTotals();draw();};
+    holder.appendChild(d);
+    const c=d.querySelector('canvas');
+    requestAnimationFrame(()=>thumb(c,op));});
+}
+function thumb(c,op){
+  const w=c.clientWidth||150,h=Math.round(w*0.75);
+  c.width=w*DPR;c.height=h*DPR;c.style.height=h+'px';
+  const g=c.getContext('2d');g.setTransform(DPR,0,0,DPR,0,0);g.clearRect(0,0,w,h);
+  const b=bboxOf(S.pts),bw=Math.max(b.x1-b.x0,.1),bh=Math.max(b.y1-b.y0,.1);
+  const k=Math.min((w-8)/bw,(h-8)/bh);
+  const X=x=>(x-b.x0)*k+(w-bw*k)/2,Y=y=>h-((y-b.y0)*k+(h-bh*k)/2);
+  op.rooms.forEach(r=>{
+    g.fillStyle=roomColor(r.i,r.cat);
+    r.rects.forEach(R=>g.fillRect(X(R.x),Y(R.y+R.h),R.w*k,R.h*k));});
+  g.strokeStyle='#0F1720';g.lineWidth=.7;
+  op.rooms.forEach(r=>{g.beginPath();
+    r.edges.forEach(e=>{g.moveTo(X(e.x1),Y(e.y1));g.lineTo(X(e.x2),Y(e.y2));});g.stroke();});
+  g.lineWidth=1.2;g.beginPath();
+  S.pts.forEach((p,i)=>i?g.lineTo(X(p.x),Y(p.y)):g.moveTo(X(p.x),Y(p.y)));
+  g.closePath();g.stroke();
+}
+
+/* ═════════ exportar ═════════ */
+$('#bPng').onclick=()=>{const a=document.createElement('a');
+  a.download=S.sel>=0?`planta-opcion-${String(S.sel+1).padStart(2,'0')}.png`:'planta.png';
+  a.href=cv.toDataURL('image/png');a.click();};
+$('#bSvg').onclick=()=>{
+  const b=bboxOf(S.pts),sc=40,pad=44;
+  const W=(b.x1-b.x0)*sc+pad*2,H=(b.y1-b.y0)*sc+pad*2;
+  const X=x=>((x-b.x0)*sc+pad).toFixed(2),Y=y=>(H-pad-(y-b.y0)*sc).toFixed(2);
+  let s=`<svg xmlns="http://www.w3.org/2000/svg" width="${W.toFixed(0)}" height="${H.toFixed(0)}" viewBox="0 0 ${W.toFixed(2)} ${H.toFixed(2)}"><rect width="100%" height="100%" fill="#fff"/>`;
+  const o=S.sel>=0?S.options[S.sel]:null;
+  if(o){
+    o.rooms.forEach(r=>r.rects.forEach(R=>{
+      s+=`<rect x="${X(R.x)}" y="${Y(R.y+R.h)}" width="${(R.w*sc).toFixed(2)}" height="${(R.h*sc).toFixed(2)}" fill="${roomColor(r.i,r.cat)}"/>`;}));
+    let ed='';
+    o.rooms.forEach(r=>r.edges.forEach(e=>{
+      ed+=`<line x1="${X(e.x1)}" y1="${Y(e.y1)}" x2="${X(e.x2)}" y2="${Y(e.y2)}"/>`;}));
+    s+=`<g stroke="#0F1720" stroke-width="1.4">${ed}</g>`;
+    let gaps='',leaves='';
+    o.doors.forEach(d=>{const q=doorParts(d);if(!q)return;
+      gaps+=`<line x1="${X(q.p1.x)}" y1="${Y(q.p1.y)}" x2="${X(q.p2.x)}" y2="${Y(q.p2.y)}"/>`;
+      leaves+=`<line x1="${X(q.p1.x)}" y1="${Y(q.p1.y)}" x2="${X(q.end.x)}" y2="${Y(q.end.y)}"/>`;
+      leaves+=`<polyline fill="none" points="${q.arc.map(p=>X(p.x)+','+Y(p.y)).join(' ')}"/>`;});
+    s+=`<g stroke="#fff" stroke-width="3.4">${gaps}</g>`;
+    s+=`<g stroke="#0F1720" stroke-width="0.8" opacity=".55" fill="none">${leaves}</g>`;
+    if(o.entrance){const e=o.entrance,w=parseFloat($('#door').value)||0.85;
+      s+=`<line x1="${X(e.p.x-e.dir.x*w/2)}" y1="${Y(e.p.y-e.dir.y*w/2)}" x2="${X(e.p.x+e.dir.x*w/2)}" y2="${Y(e.p.y+e.dir.y*w/2)}" stroke="#fff" stroke-width="4"/>`;}}
+  syncSides();
+  {const n2=S.pts.length;
+   for(let i=0;i<n2;i++){const a=S.pts[i],b=S.pts[(i+1)%n2],sd=sideAt(i);
+     s+=`<line x1="${X(a.x)}" y1="${Y(a.y)}" x2="${X(b.x)}" y2="${Y(b.y)}" stroke="#0F1720" stroke-width="${sd.wall==='medianera'?6:2.8}"/>`;}}
+  const n=S.pts.length;
+  for(let i=0;i<n;i++){const a=S.pts[i],c2=S.pts[(i+1)%n],L=dist(a,c2);
+    const mx=(a.x+c2.x)/2,my=(a.y+c2.y)/2;
+    let nx=-(c2.y-a.y)/L,ny=(c2.x-a.x)/L;
+    if(inPoly(mx+nx*0.12,my+ny*0.12,S.pts)){nx=-nx;ny=-ny;}
+    s+=`<text x="${X(mx+nx*0.55)}" y="${Y(my+ny*0.55)}" text-anchor="middle" font-family="monospace" font-size="11" fill="#5B6771">${nf(L,2)}</text>`;}
+  if(o)o.rooms.forEach(r=>{
+    const R=r.rects.reduce((a,b)=>a.w*a.h>b.w*b.h?a:b);
+    const cx=R.x+R.w/2,cy=R.y+R.h/2;
+    s+=`<text x="${X(cx)}" y="${(+Y(cy)-6).toFixed(2)}" text-anchor="middle" font-family="sans-serif" font-size="11" font-weight="600" fill="#0F1720">${r.name.toUpperCase()}</text>`;
+    s+=`<text x="${X(cx)}" y="${(+Y(cy)+8).toFixed(2)}" text-anchor="middle" font-family="monospace" font-size="10" fill="#5B6771">${nf(r.w,2)} × ${nf(r.h,2)} · ${nf(r.area,1)} m²</text>`;});
+  s+='</svg>';
+  const a=document.createElement('a');
+  a.download=S.sel>=0?`planta-opcion-${String(S.sel+1).padStart(2,'0')}.svg`:'planta.svg';
+  a.href=URL.createObjectURL(new Blob([s],{type:'image/svg+xml'}));a.click();};
+
+/* ═════════ arranque ═════════ */
+new ResizeObserver(()=>resize()).observe(stage);
+renderRooms();refreshEdges();hint();
+resize();fitView();
+</script>
+</body>
+</html>
