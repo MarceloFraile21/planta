@@ -334,6 +334,22 @@ function plantDiag(){const xs=S.pts.map(p=>p.x),ys=S.pts.map(p=>p.y);
   return Math.max(1,Math.hypot(Math.max(...xs)-Math.min(...xs),
                                Math.max(...ys)-Math.min(...ys)));}
 const OPEN_DEF={privado:'nexo',servicio:'pref',publico:'libre',nexo:'libre',resto:'libre'};
+// Nexo que sirve a los privados de «abre a: sólo nexo». Un único criterio para
+// las tres decisiones que dependen de él: con qué nexo viajan los privados al
+// repartir franjas (buildOption), cuántas unidades indivisibles hay (nUnidades)
+// y qué nexo hace de banda en la crujía (layoutCorridor). Se elige el de lado
+// mayor: una banda tiene que medir al menos su lado largo y es el frente lo que
+// da sitio a varias puertas.
+// ANTES los privados se repartían por ÍNDICE entre los nexos, en bloques
+// equilibrados, sin mirar su geometría. En la vivienda el Vestíbulo (1,6×3,
+// declarado antes) recibía dos dormitorios y el Distribuidor (1,2×6) uno; la
+// crujía, en cambio, se montaba sobre el Distribuidor. El Vestíbulo no puede
+// ser banda de dos dormitorios, así que el bloque no se resolvía: en 12×9 la
+// vivienda daba 0 estrictas y la app saltaba al escalón que cede la apertura.
+const longNexo=r=>Math.max(r.a,r.b);
+function nexoServidor(idx,list){
+  return idx.reduce((p,q)=>longNexo(list[q])>longNexo(list[p])+1e-9||
+    (Math.abs(longNexo(list[q])-longNexo(list[p]))<1e-9&&minArea(list[q])>minArea(list[p]))?q:p);}
 function addRoom(n,c,a,b,mx=0,o){
   if(S.rooms.length>=20)return;
   S.rooms.push(Object.assign({id:RID++,name:n,cat:c,a,b,maxArea:mx,
@@ -1219,8 +1235,10 @@ function layout(R,items,rng,prop,noise){
   return null;
 }
 function layoutCorridor(R,items,rng){
-  let bi=-1;
-  items.forEach((t,k)=>{if(t.cat==='nexo'&&(bi<0||t.area>items[bi].area))bi=k;});
+  // la banda es el nexo servidor: el mismo criterio que decidió con qué nexo
+  // viajan los privados (antes aquí mandaba la superficie objetivo)
+  const nk=items.map((t,k)=>k).filter(k=>items[k].cat==='nexo');
+  const bi=nk.length?nexoServidor(nk,items):-1;
   if(bi<0||items.length<2)return null;
   for(const horiz of (R.w>=R.h?[true,false]:[false,true])){
     const along=horiz?R.w:R.h,deep=horiz?R.h:R.w;
@@ -1380,7 +1398,9 @@ function doorPlan(rooms,shapes,doorW,start,relaxSet){
   const mode=r=>r.open||OPEN_DEF[r.cat]||'libre';
   const link=(u,q)=>{
     const c=adj[u<q?u+'-'+q:q+'-'+u];
-    if(!c||c.len<doorW-1e-4)return null;
+    // mismo criterio que la entrada exterior (sideFitsDoor): el paso de puerta
+    // más la holgura libre en cada extremo
+    if(!c||!sideFitsDoor(c.len,doorW))return null;
     // La superficie libre es área NO programada: no es circulación y no puede
     // encadenar accesos; y el privado nunca es espacio de paso.
     if(!doorAllowed(rooms,u,q,relaxSet,hasNexo))return null;
@@ -1401,7 +1421,10 @@ function doorPlan(rooms,shapes,doorW,start,relaxSet){
       const nd=dist[u]+e.w+1/(1+e.c.len);
       if(nd<dist[q]){dist[q]=nd;par[q]=u;}}}
   const mk=(a,b,c)=>{
-    const sg=c.seg,L=Math.hypot(sg.x2-sg.x1,sg.y2-sg.y1),w=Math.min(doorW,L*0.9);
+    const sg=c.seg,L=Math.hypot(sg.x2-sg.x1,sg.y2-sg.y1),w=doorW;
+    // ANTES w=min(doorW, 0,9·L): con un frente entre 0,85 y 0,94 m se dibujaba
+    // una puerta de 0,77 m que la validación daba por buena. El frente ya está
+    // garantizado por sideFitsDoor, así que la hoja mide siempre el paso declarado.
     const mx=(sg.x1+sg.x2)/2,my=(sg.y1+sg.y2)/2,ux=(sg.x2-sg.x1)/L,uy=(sg.y2-sg.y1)/L;
     return{a,b,seg:{x1:mx-ux*w/2,y1:my-uy*w/2,x2:mx+ux*w/2,y2:my+uy*w/2}};};
   const doors=[],deg=new Int32Array(R);
@@ -1418,7 +1441,7 @@ function doorPlan(rooms,shapes,doorW,start,relaxSet){
     if(rooms[i].cat==='privado'||rooms[j].cat==='privado')continue;
     if(!doorAllowed(rooms,i,j,relaxSet,hasNexo))continue;   // mismo criterio que el árbol
     const c=adj[i+'-'+j];
-    if(!c||c.len<doorW-1e-4)continue;
+    if(!c||!sideFitsDoor(c.len,doorW))continue;
     doors.push(mk(i,j,c));deg[i]++;deg[j]++;}
   // Profundidad topológica medida por BFS sobre el grafo FINAL de puertas, no
   // sobre el árbol de padres: una conexión secundaria puede acortar también el
@@ -1482,9 +1505,8 @@ function buildOption(rng,prop,doorW,noise,relax,relaxSet){
     if(nx.length&&!relaxSet.apertura){
       const pv=S.rooms.map((r,i)=>i).filter(i=>S.rooms[i].cat==='privado'&&
         (S.rooms[i].open||OPEN_DEF.privado)==='nexo');
-      if(pv.length){const per=Math.ceil(pv.length/nx.length);
-        pv.forEach((pi,k)=>{const n2=nx[Math.min(nx.length-1,Math.floor(k/per))];
-          const a=f(pi),b=f(n2);if(a!==b)bo[a]=b;});}}
+      if(pv.length){const n2=nexoServidor(nx,S.rooms);
+        pv.forEach(pi=>{const a=f(pi),b=f(n2);if(a!==b)bo[a]=b;});}}
     const set=new Set();S.rooms.forEach((r,i)=>set.add(f(i)));
     return Math.max(1,set.size);})();
   // Condición DUAL, que faltaba. prechecks() comprobaba «¿cabe cada local en
@@ -1532,23 +1554,17 @@ function buildOption(rng,prop,doorW,noise,relax,relaxSet){
     const privs=rooms.map((r,i)=>i).filter(i=>rooms[i].cat==='privado'&&
       (rooms[i].open||OPEN_DEF.privado)==='nexo');
     if(privs.length){
-      // reparte los privados entre los nexos disponibles, en bloques equilibrados
-      const per=Math.ceil(privs.length/nexos.length);
-      privs.forEach((pi,k)=>{const nx=nexos[Math.min(nexos.length-1,Math.floor(k/per))];
-        const a=find(pi),b=find(nx);if(a!==b)blockOf[a]=b;});}}
-  // Dos nociones de bloque, que antes estaban confundidas en una:
-  //  · blockOf/find — para la ASIGNACIÓN A REGIONES: el nexo y sus privados
-  //    tienen que caer en la misma franja o ninguna puerta podrá cumplir la
-  //    regla. Aquí sí viajan juntos.
-  //  · contOf/findC — para la GUILLOTINA: sólo «contiguo» obliga a no cortar
-  //    entre dos locales. Meter ahí al grupo nexo+privados lo convertía en un
-  //    átomo de 4 locales que layout() no podía subdividir nunca, y la única
-  //    salida eran franjas paralelas de fachada a fachada. Con el preset de
-  //    oficina en un rectángulo de 14×10 eso daba 0 candidatas de 480.
-  const contOf=rooms.map((r,i)=>i);
-  const findC=x=>{while(contOf[x]!==x)x=contOf[x]=contOf[contOf[x]];return x;};
-  for(let i=0;i<S.rooms.length;i++)for(let j=i+1;j<S.rooms.length;j++)
-    if(relOf(i,j)==='contiguo'){const a=findC(i),b=findC(j);if(a!==b)contOf[a]=b;}
+      // todos al nexo servidor (ver nexoServidor): repartirlos por índice
+      // ignoraba la geometría del nexo
+      const nx=nexoServidor(nexos,rooms);
+      privs.forEach(pi=>{const a=find(pi),b=find(nx);if(a!==b)blockOf[a]=b;});}}
+  // Una sola noción de bloque, blockOf/find, para la asignación a franjas Y
+  // para la guillotina. Aquí había un segundo union-find (contOf/findC, sólo
+  // «contiguo») que el comentario presentaba como el que usaba la guillotina;
+  // nunca se usó. Medido: si la guillotina lo usara, la vivienda en L pasa de
+  // 29 a 4 estrictas y la oficina en 16×10 de 63 a 0. La penalización por
+  // romper el bloque nexo+privados es justamente lo que mantiene a los
+  // privados pegados a su nexo. Se elimina para que nadie lo «arregle».
   const blocks={};
   rooms.forEach((r,i)=>{const b=find(i);(blocks[b]=blocks[b]||[]).push(i);});
   const bandCat=g=>{for(const c of ['publico','privado','servicio','nexo','resto'])
@@ -1588,7 +1604,10 @@ function buildOption(rng,prop,doorW,noise,relax,relaxSet){
       const canDown=k=>k>0&&k<order.length&&breakable[k];
       if(n>1&&sumLo(r)>cap[r]+1e-6){
         if(r<NR-1&&canDown(cuts[r+1]-1)){cuts[r+1]--;ch=true;}
-        else if(cuts[r]<cuts[r+1]-1&&canDown(cuts[r]+1)){cuts[r]++;ch=true;}
+        // r>0: el primer corte es siempre 0. Moverlo sacaba order[0] de todos
+        // los grupos y el local desaparecía sin aviso (la candidata moría más
+        // tarde, en «shapes vacío», y contaba como fallo de geometría).
+        else if(r>0&&cuts[r]<cuts[r+1]-1&&canDown(cuts[r]+1)){cuts[r]++;ch=true;}
       }else if(sumHi(r)<cap[r]-1e-6||n===0){
         if(r<NR-1&&cuts[r+2]-cuts[r+1]>1&&canDown(cuts[r+1]+1)){cuts[r+1]++;ch=true;}
         else if(r>0&&cuts[r]-cuts[r-1]>1&&canDown(cuts[r]-1)){cuts[r]--;ch=true;}}
@@ -1597,7 +1616,11 @@ function buildOption(rng,prop,doorW,noise,relax,relaxSet){
   }
   const groups=[];
   for(let r=0;r<NR;r++)groups.push(order.slice(cuts[r],cuts[r+1]));
-  if(groups.some(g=>!g.length))return null;
+  // Un grupo vacío o un grupo cuyos mínimos no caben en su franja NO se
+  // descartan aquí: el emparejamiento de abajo puede repararlos. Antes el
+  // grupo vacío devolvía null ANTES de llegar a él, y el grupo que no cabía
+  // por superficie pasaba sin control a la guillotina, que fallaba siempre.
+  const sumMinG=g=>g.reduce((t,i)=>t+minArea(rooms[i]),0);
   // ── asignación por compatibilidad ─────────────────────────────────────
   // El reparto por cortes ordena por categoría y acumula superficie: no sabe si
   // el local CABE físicamente en la franja que le toca. Era la primera causa de
@@ -1609,13 +1632,17 @@ function buildOption(rng,prop,doorW,noise,relax,relaxSet){
   const cabeEn=(i,r)=>{const R=regs[r],a=rooms[i].a,b=rooms[i].b;
     return (R.w>=a-1e-4&&R.h>=b-1e-4)||(R.w>=b-1e-4&&R.h>=a-1e-4);};
   const nMal=()=>{let n=0;groups.forEach((g,r)=>g.forEach(i=>{if(!cabeEn(i,r))n++;}));return n;};
-  if(nMal()){
+  if(nMal()||groups.some((g,r)=>!g.length||sumMinG(g)>cap[r]+1e-6)){
     const bloques=[],idx={};
     order.forEach(i=>{const k=String(i<blockOf.length?find(i):i);
       if(idx[k]===undefined){idx[k]=bloques.length;bloques.push([]);}
       bloques[idx[k]].push(i);});
     const NB=bloques.length;
-    const cabeB=(b,r)=>bloques[b].every(i=>cabeEn(i,r));
+    // Un bloque cabe en una franja si cabe CADA local y además la suma de sus
+    // mínimos cabe en la franja. Antes sólo se miraba lo primero: en la U, la
+    // franja de 6×5 (30 m²) recibía Estar+Cocina, que suman 32,24 m² de mínimo.
+    const cabeB=(b,r)=>bloques[b].every(i=>cabeEn(i,r))&&
+      sumMinG(bloques[b])<=cap[r]+1e-6;
     const deBloque=new Int32Array(NB).fill(-1);       // bloque → región asignada
     const kuhn=(r,vis)=>{
       for(let b=0;b<NB;b++){
@@ -1635,7 +1662,9 @@ function buildOption(rng,prop,doorW,noise,relax,relaxSet){
         let mejor=-1,holgura=-1e18;
         for(let q=0;q<NR;q++){
           if(!cabeB(b,q))continue;
-          const h=cap[q]-sumMin(ng[q]);
+          // holgura que QUEDA tras meter el bloque; si no cabe, no es candidata
+          const h=cap[q]-sumMin(ng[q])-sumMin(bloques[b]);
+          if(h<-1e-6)continue;
           if(h>holgura){holgura=h;mejor=q;}}
         if(mejor<0)return null;
         r=mejor;}
@@ -1643,6 +1672,7 @@ function buildOption(rng,prop,doorW,noise,relax,relaxSet){
     if(ng.some(g=>!g.length))return null;
     for(let r=0;r<NR;r++)groups[r]=ng[r];
   }
+  if(groups.some(g=>!g.length))return null;
   for(let r=0;r<NR;r++){                       // el local debe caber en su región
     const w=regs[r].w,h=regs[r].h;
     for(const i of groups[r]){
